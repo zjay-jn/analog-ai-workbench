@@ -7,7 +7,8 @@ import {pathToFileURL} from 'node:url';
 import {runInNewContext} from 'node:vm';
 import {parseInstalledSmokeOptions, installedSmokeEnvironment, validateInstalledProfile, validateInstalledReady,
   validateInstalledAddon, installedFreshBootName, installedOwnershipKey, validateInstalledOwnership, installedRendererMatches,
-  installedFailureSnapshot, installedFailureDiagnostics, installedRendererProbe, checkoutRoot} from '../tools/installed-desktop-smoke.mjs';
+  installedFailureSnapshot, installedFailureDiagnostics, installedRendererProbe, captureInstalledPage, openInstalledSynthetic,
+  checkoutRoot} from '../tools/installed-desktop-smoke.mjs';
 import {assertFirstProfile} from '../tools/portable-desktop-smoke.mjs';
 
 const digest = 'a'.repeat(64), other = 'b'.repeat(64);
@@ -130,6 +131,29 @@ test('the installed UI probe waits for the committed document and observes the m
   page.document.body.innerText = 'private synthetic text with ' + marker;
   assert.deepEqual({...probe()}, {textarea: true, settings: true, workspace: true, noNode: true, markerVisible: true});
   page.location.href = 'about:blank'; assert.equal(probe(), null);
+});
+
+test('a mounted background renderer can capture a PNG without an animation frame', async () => {
+  const url = pathToFileURL(path.join(install, 'dist/renderer/index.html')).href;
+  const page = {location: {href: url}, innerWidth: 800, innerHeight: 600, document: {visibilityState: 'hidden', querySelector: () => ({})}};
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1kAAAAASUVORK5CYII=';
+  const cdp = {evaluate: expression => runInNewContext(expression, page),
+    send(method) {assert.equal(method, 'Page.captureScreenshot'); return {data: png};}};
+  const folder = path.join(checkoutRoot, '.local/installed-smoke-unit/capture-' + randomUUID());
+  fs.mkdirSync(folder, {recursive: true});
+  const captured = await captureInstalledPage(cdp, url, folder, 'background.png');
+  assert.equal(captured.frame.visibility, 'hidden'); assert.equal(fs.readFileSync(path.join(folder, captured.name)).toString('base64'), png);
+  page.innerWidth = 0; await assert.rejects(captureInstalledPage(cdp, url, folder, 'zero.png'), /SCREENSHOT_VIEWPORT_NOT_READY/);
+  page.innerWidth = 800; cdp.send = () => ({data: Buffer.from('invalid image').toString('base64')});
+  await assert.rejects(captureInstalledPage(cdp, url, folder, 'invalid.png'), /SCREENSHOT_INVALID/);
+});
+
+test('opening the synthetic schematic waits for enabled controls and clicks each once', async () => {
+  let menuClicked = 0, itemClicked = 0, menuProbes = 0, itemProbes = 0;
+  const document = {querySelector: () => ++menuProbes === 1 ? null : {click: () => menuClicked++},
+    querySelectorAll: () => [{textContent: '打开合成原理图', disabled: ++itemProbes === 1, click: () => itemClicked++}]};
+  await openInstalledSynthetic({evaluate: expression => runInNewContext(expression, {document})});
+  assert.deepEqual([menuClicked, itemClicked], [1, 1]);
 });
 
 test('first-profile checks preserve occupied synthetic stores and refuse aliases before traversal', () => {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aaw.public-source-export/v1",
   "policySha256": "deef0dfa69e58ccd0a2fb423143c671bcb0e59bdf8aa30f671a10b8e735fab3b",
-  "planSha256": "c1dce43d6caead9feb1f575328ba3fb15dc23d544319fd03c9f8efd2385c0b28",
+  "planSha256": "4c65023d1f8308723813578dadeec438ac476e787ebb3b43ca3487f6e245ed66",
   "files": [
     {
       "source": ".gitattributes",
@@ -3318,8 +3318,8 @@
     {
       "source": "tests/installed-desktop-smoke.test.mjs",
       "destination": "tests/installed-desktop-smoke.test.mjs",
-      "bytes": 14862,
-      "sha256": "77a570d959771e1473d982ef7c8785686b72a5024a108021416c9126a5642dd8"
+      "bytes": 16767,
+      "sha256": "fecba1b7ccd97f5b65f1677aedadb85e010b9e88430c2165bea700f33991dac6"
     },
     {
       "source": "tests/ipc-caller.test.ts",
@@ -4332,8 +4332,8 @@
     {
       "source": "tools/installed-desktop-smoke.mjs",
       "destination": "tools/installed-desktop-smoke.mjs",
-      "bytes": 36945,
-      "sha256": "2f90bb360beb2981e80a9c63fdeb6c6af9c57173c9b06286c1b527739e423187"
+      "bytes": 37617,
+      "sha256": "f3f78d74a43259e2cfe93fe211e2744f4d9906fc38c2884f8193718e39d5155a"
     },
     {
       "source": "tools/license-inventory.mjs",

@@ -287,15 +287,33 @@ function debuggerSocket(value, port) {
   if (url.protocol !== 'ws:' || url.hostname !== '127.0.0.1' || url.port !== String(port) || url.username || url.password) throw Error('CDP_ENDPOINT_NOT_OWNED');
   return value;
 }
-async function capture(cdp, folder, name) {
-  await cdp.send('Page.bringToFront');
-  const frame = await cdp.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve({visibility:document.visibilityState,width:innerWidth,height:innerHeight}))))');
+export async function captureInstalledPage(cdp, rendererUrl, folder, name) {
+  // A background Chromium window can suspend animation frames while its compositor still supports screenshots.
+  const frame = await cdp.evaluate(`({mounted: location.href === ${JSON.stringify(rendererUrl)} && !!document.querySelector('textarea'),
+    visibility: document.visibilityState, width: innerWidth, height: innerHeight})`);
+  if (!frame?.mounted || !(frame.width > 0 && frame.height > 0)) throw Error('SCREENSHOT_VIEWPORT_NOT_READY');
   const image = await cdp.send('Page.captureScreenshot', {format: 'png', fromSurface: true, captureBeyondViewport: false});
   const bytes = Buffer.from(image.data ?? '', 'base64');
-  if (bytes.length < 24 || bytes.length > 32 * 1024 * 1024 || !bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
-    || bytes.readUInt32BE(16) < 1 || bytes.readUInt32BE(20) < 1 || frame?.visibility !== 'visible') throw Error('SCREENSHOT_INVALID');
+  if (bytes.length < 45 || bytes.length > 32 * 1024 * 1024 || !bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+    || bytes.toString('ascii', 12, 16) !== 'IHDR' || bytes.readUInt32BE(16) < 1 || bytes.readUInt32BE(20) < 1
+    || !bytes.subarray(-12).equals(Buffer.from('0000000049454e44ae426082', 'hex'))) throw Error('SCREENSHOT_INVALID');
   fs.writeFileSync(path.join(folder, name), bytes, {flag: 'wx'});
   return {name, bytes: bytes.length, sha256: hash(bytes), width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), frame};
+}
+
+async function clickWhenReady(page, expression, failure) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if (await page.evaluate(expression)) return;
+    await sleep(100);
+  }
+  throw Error(failure);
+}
+
+export async function openInstalledSynthetic(page) {
+  await clickWhenReady(page, `(() => {const button = document.querySelector('.file-workbench button[aria-label="打开文档"]');
+    if (!button || button.disabled) return false; button.click(); return true;})()`, 'SYNTHETIC_MENU_MISSING');
+  await clickWhenReady(page, `(() => {const items = [...document.querySelectorAll('[role="menuitem"]')].filter(item => item.textContent.trim() === '打开合成原理图');
+    if (items.length !== 1 || items[0].disabled) return false; items[0].click(); return true;})()`, 'SYNTHETIC_ITEM_MISSING');
 }
 
 async function launch(context, current, marker, output) {
@@ -308,7 +326,7 @@ async function launch(context, current, marker, output) {
     packageSha: context.packageSha, profileRevision: nativeProfile.profileRevision, rendererNetworkAttempts: [], shutdownFailures: [],
     screenshots: [], normalClose: false, entryReplaced: false, storageOverridden: false};
   const child = spawn(options.exe, ['--remote-debugging-address=127.0.0.1', '--remote-debugging-port=' + port],
-    {cwd: path.dirname(options.exe), env: installedSmokeEnvironment(nativeProfile, process.env, temporary), shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']});
+    {cwd: path.dirname(options.exe), env: installedSmokeEnvironment(nativeProfile, process.env, temporary), shell: false, stdio: ['ignore', 'pipe', 'pipe']});
   let closed = false, code = null, stdout = '', stderr = '', page, browser, gracefulRequested = false, expired = false;
   const shutdownFailures = new Set(), tails = {stdout: '', stderr: ''};
   const observe = (stream, bytes) => {
@@ -369,19 +387,17 @@ async function launch(context, current, marker, output) {
       || (current === 'cold' ? workspace.value.projects[0].name !== marker || workspace.value.revision < 1 : workspace.value.revision !== 0)) throw Error('WORKSPACE_UNEXPECTED');
     report.workspace = {revision: workspace.value.revision, name: workspace.value.projects[0].name, sessions: 0};
     report.bootstrap = currentReady(context); report.addon = freshAddon(context, previousBoots); report.packagedBootstrapObserved = true;
-    report.stage = 'capture-main'; report.screenshots.push(await capture(page, folder, 'workbench.png'));
+    report.stage = 'capture-main'; report.screenshots.push(await captureInstalledPage(page, target.url, folder, 'workbench.png'));
     if (current === 'first') {
       report.stage = 'open-synthetic';
-      if (!await page.evaluate('(()=>{const b=[...document.querySelectorAll(".file-workbench button")].find(n=>n.getAttribute("aria-label")==="打开文档");if(!b||b.disabled)return false;b.click();return true})()')) throw Error('SYNTHETIC_MENU_MISSING');
-      await sleep(100);
-      if (!await page.evaluate('(()=>{const items=[...document.querySelectorAll("[role=menuitem]")].filter(n=>n.textContent.trim()==="打开合成原理图");if(items.length!==1)return false;items[0].click();return true})()')) throw Error('SYNTHETIC_ITEM_MISSING');
+      await openInstalledSynthetic(page);
       let schematic;
       for (let attempt = 0; attempt < 80; attempt++) {
         schematic = await page.evaluate('(()=>{const p=document.querySelector("[data-schematic-kind=synthetic]"),svg=p?.querySelector("svg[data-schematic-canvas=true]"),r=svg?.getBoundingClientRect();return {status:p?.dataset.status,graphics:svg?.querySelectorAll("polyline,line,rect,path,circle,polygon,text").length??0,width:r?.width??0,height:r?.height??0}})()');
         if (schematic.status === 'ready' && schematic.graphics >= 4 && schematic.width > 0 && schematic.height > 0) break; await sleep(100);
       }
       if (schematic?.status !== 'ready' || schematic.graphics < 4 || schematic.width <= 0 || schematic.height <= 0) throw Error('SYNTHETIC_NOT_RENDERED');
-      report.synthetic = schematic; report.stage = 'capture-synthetic'; report.screenshots.push(await capture(page, folder, 'synthetic.png'));
+      report.synthetic = schematic; report.stage = 'capture-synthetic'; report.screenshots.push(await captureInstalledPage(page, target.url, folder, 'synthetic.png'));
       report.stage = 'save-synthetic-project';
       const saved = await page.evaluate(`(async()=>{const r=await window.workbenchWorkspace.read({contractVersion:"workbench.workspace.v1"});if(!r.ok)return r;const state=r.value;state.projects[0].name=${JSON.stringify(marker)};return window.workbenchWorkspace.save({contractVersion:"workbench.workspace.v1",expectedRevision:state.revision,state})})()`);
       if (!saved.ok || saved.value.projects[0].name !== marker) throw Error('PROJECT_SAVE_FAILED'); report.persistedMarker = marker;
