@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import test from 'node:test';
-import {parseInstallerSmokeArguments,validateInstallerReceipt,verifyInstallerBuildInput,snapshotInstallerTree,sameInstallerSnapshot,assertFreshInstallerRoots,installerSmokeEnvironment,parseInstalledSmokeOutput,validateInstalledSmokeSummary} from '../tools/windows-installer-smoke.mjs';
+import {parseInstallerSmokeArguments,validateInstallerReceipt,verifyInstallerBuildInput,snapshotInstallerTree,sameInstallerSnapshot,assertFreshInstallerRoots,installerSmokeEnvironment,installerSmokeBootstrapEnvironment,installerKnownFoldersScript,INSTALLER_METADATA_TIMEOUT_MS,parseInstalledSmokeOutput,validateInstalledSmokeSummary} from '../tools/windows-installer-smoke.mjs';
 import {INSTALLER_MARKER,INSTALLER_MARKER_BYTES} from '../tools/windows-installer-script.mjs';
+import {ordinary,sha} from '../tools/portable-runtime-lib.mjs';
 
 const root=path.resolve(import.meta.dirname,'..'),parent=path.join(root,'.local/windows-installer-smoke-tests');fs.mkdirSync(parent,{recursive:true});
 const fixture=()=>fs.mkdtempSync(path.join(parent,'case-')),digest=value=>crypto.createHash('sha256').update(value).digest('hex');
@@ -47,6 +49,22 @@ test('userdata snapshots fail closed on links instead of traversing external con
 test('installer environment contains only explicit OS locations and no development/tool/credential inheritance',()=>{
   const directory=fixture(),folders=Object.fromEntries(['profile','localAppData','roamingAppData','temporaryDirectory'].map(name=>[name,path.join(directory,name)])),system=path.join(directory,'Windows'),env=installerSmokeEnvironment(folders,system);assert.equal(env.PATH,path.join(system,'System32'));assert.equal(env.APPDATA,folders.roamingAppData);assert.equal(env.LOCALAPPDATA,folders.localAppData);
   for(const name of ['NODE_OPTIONS','NODE_PATH','ELECTRON_RUN_AS_NODE','PYTHONPATH','VSINSTALLDIR','VCINSTALLDIR','AAW_NATIVE_PYTHON','GH_TOKEN','GITHUB_TOKEN','NPM_TOKEN','OPENAI_API_KEY'])assert.equal(Object.hasOwn(env,name),false);
+});
+test('initial metadata environment bootstraps only pinned OS locations and owned temp before KnownFolder discovery',()=>{
+  const directory=fixture(),system=path.join(directory,'Windows'),temporary=path.join(directory,'owned-temp'),env=installerSmokeBootstrapEnvironment(system,temporary);
+  assert.deepEqual(Object.keys(env).sort(),['SystemRoot','windir','SystemDrive','PATH','ComSpec','PATHEXT','TEMP','TMP'].sort());assert.equal(env.SystemRoot,system);assert.equal(env.windir,system);assert.equal(env.PATH,path.join(system,'System32'));assert.equal(env.TEMP,temporary);assert.equal(env.TMP,temporary);
+  for(const key of ['USERPROFILE','APPDATA','LOCALAPPDATA','NODE_OPTIONS','PYTHONPATH','VSINSTALLDIR','GH_TOKEN'])assert.equal(Object.hasOwn(env,key),false);
+  assert.equal(INSTALLER_METADATA_TIMEOUT_MS,60000);assert.throws(()=>installerSmokeBootstrapEnvironment('relative',temporary),/SMOKE_OS_ENVIRONMENT/);assert.throws(()=>installerSmokeBootstrapEnvironment(system,'relative'),/SMOKE_OS_ENVIRONMENT/);
+});
+test('actual readonly KnownFolder script returns normal JSON with only the OS bootstrap environment',{skip:process.platform!=='win32'},()=>{
+  const directory=fixture(),temporary=path.join(directory,'owned-temp');fs.mkdirSync(temporary);ordinary(temporary,true);
+  const systemRoot=path.resolve(process.env.SystemRoot),shell=path.join(systemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe'),before=ordinary(shell,false,true),shellPin={path:shell,bytes:before.size,sha256:sha(shell)};
+  const environment=installerSmokeBootstrapEnvironment(systemRoot,temporary),started=Date.now(),result=spawnSync(shell,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(installerKnownFoldersScript,'utf16le').toString('base64')],{cwd:directory,env:environment,shell:false,windowsHide:true,encoding:'utf8',timeout:INSTALLER_METADATA_TIMEOUT_MS,maxBuffer:65536});
+  fs.writeFileSync(path.join(directory,'metadata.stdout.log'),result.stdout??'');fs.writeFileSync(path.join(directory,'metadata.stderr.log'),result.stderr??'');
+  assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);const value=JSON.parse(result.stdout);
+  for(const key of ['localAppData','roamingAppData','desktop','programs','profile'])assert(path.isAbsolute(value[key]));assert.match(value.userSidSha256,/^[a-f0-9]{64}$/u);assert.equal(ordinary(shell,false,true).size,shellPin.bytes);assert.equal(sha(shell),shellPin.sha256);
+  fs.writeFileSync(path.join(directory,'metadata-receipt.json'),JSON.stringify({schema:'aaw.readonly-known-folder-fixture/v1',status:'PASS',shell:shellPin,environment,elapsedMs:Date.now()-started,exitCode:result.status,fields:Object.keys(value),scope:'Only Windows identity and OS KnownFolder APIs; no installer, native helper, application launch or AppData file access.'},null,2)+'\n');
+  console.log(JSON.stringify({status:'PASS',readonlyMetadataEvidence:directory}));
 });
 test('desktop evidence must be this subprocess final unique PASS JSON, never a scanned old summary',()=>{
   const item={schemaVersion:'aaw.installed-desktop-smoke-result/v1',status:'PASS',evidence:path.join(fixture(),'summary.json')},line=JSON.stringify(item);assert.deepEqual(parseInstalledSmokeOutput('routine log\n'+line+'\n'),item);

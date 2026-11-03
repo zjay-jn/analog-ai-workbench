@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aaw.public-source-export/v1",
   "policySha256": "deef0dfa69e58ccd0a2fb423143c671bcb0e59bdf8aa30f671a10b8e735fab3b",
-  "planSha256": "9e6d258e516f86d1f39034914b6a88393be3ef18c48999278bea912e2cbe5260",
+  "planSha256": "e58221553fdeaa817815a76af84a4842216901bfb403a2f583742555d4a31792",
   "files": [
     {
       "source": ".gitattributes",
@@ -4098,8 +4098,8 @@
     {
       "source": "tests/windows-installer-smoke.test.mjs",
       "destination": "tests/windows-installer-smoke.test.mjs",
-      "bytes": 9462,
-      "sha256": "a2f5909fdb55cfa49787bac0c989038dfb101920d44106d7e5ced93862ddb450"
+      "bytes": 12585,
+      "sha256": "d4dd92474853c46202e98d92162f907f4b8d17b26e050654db813131af2243ee"
     },
     {
       "source": "tests/windows-package.test.mjs",
@@ -4692,8 +4692,8 @@
     {
       "source": "tools/windows-installer-smoke.mjs",
       "destination": "tools/windows-installer-smoke.mjs",
-      "bytes": 21896,
-      "sha256": "42bd7061a15d065afa68e4dc73cc0a5bb061135af11a2b9822c6ac58e93c86bb"
+      "bytes": 22552,
+      "sha256": "f1c48d30af99ac11d2d5b038fdbc968cf0a14f7d14ce8f24bfb7f47ee0dd4397"
     },
     {
       "source": "tools/windows-package.mjs",
