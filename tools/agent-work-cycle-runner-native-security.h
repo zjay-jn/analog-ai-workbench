@@ -144,10 +144,47 @@ std::string Hash(HANDLE file,ULONGLONG expected){
 }
 struct GrantState {Handle handle;PSECURITY_DESCRIPTOR descriptor=nullptr;SECURITY_DESCRIPTOR_CONTROL control=0;FILE_ID_INFO identity{};std::wstring path;bool directory=false;};
 std::vector<GrantState> grants;
+// Cleanup diagnostics are observations only. Never use them to admit execution
+// or replace the exact ACL/control comparison below, and never serialize paths/SIDs.
+std::string aclFailureItems;
+size_t aclFailureCount=0,aclFailureOmitted=0;
+PSID diagnosticPackageSid=nullptr;
+std::string outputCleanupDiagnostic="null";
+std::string AclDiagnosticHash(const unsigned char* bytes,ULONG count){
+  BCRYPT_ALG_HANDLE algorithm=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;std::vector<unsigned char> object;
+  try{ULONG size=0,got=0;Require(count<=65535&&BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)==0,"diagnostic_hash");
+    Require(BCryptGetProperty(algorithm,BCRYPT_OBJECT_LENGTH,reinterpret_cast<PUCHAR>(&size),sizeof(size),&got,0)==0&&size<=65536,"diagnostic_hash");object.resize(size);
+    Require(BCryptCreateHash(algorithm,&hash,object.data(),size,nullptr,0,0)==0&&BCryptHashData(hash,const_cast<PUCHAR>(bytes),count,0)==0,"diagnostic_hash");std::array<unsigned char,32> value{};
+    Require(BCryptFinishHash(hash,value.data(),static_cast<ULONG>(value.size()),0)==0,"diagnostic_hash");BCryptDestroyHash(hash);hash=nullptr;BCryptCloseAlgorithmProvider(algorithm,0);algorithm=nullptr;return "\""+Hex(value.data(),value.size())+"\"";
+  }catch(...){if(hash)BCryptDestroyHash(hash);if(algorithm)BCryptCloseAlgorithmProvider(algorithm,0);return "null";}
+}
+std::string AclDiagnostic(PACL acl){
+  if(!acl||!IsValidAcl(acl))return "null";
+  ACL_SIZE_INFORMATION size{};if(!GetAclInformation(acl,&size,sizeof(size),AclSizeInformation))return "null";
+  bool grantPresent=false;
+  if(diagnosticPackageSid&&IsValidSid(diagnosticPackageSid))for(DWORD i=0;i<size.AceCount;++i){void* raw=nullptr;if(!GetAce(acl,i,&raw))continue;const auto ace=static_cast<const ACE_HEADER*>(raw);
+    // Grant() always inserts a basic ACCESS_ALLOWED_ACE. Inspect its bounded SID
+    // without ever converting a host account or package SID to text.
+    if(ace->AceType!=ACCESS_ALLOWED_ACE_TYPE||ace->AceSize<16)continue;const auto allowed=static_cast<const ACCESS_ALLOWED_ACE*>(raw);const auto sid=reinterpret_cast<const SID*>(&allowed->SidStart);
+    if(GetSidLengthRequired(sid->SubAuthorityCount)<=static_cast<DWORD>(ace->AceSize)-8U&&IsValidSid(const_cast<SID*>(sid))&&EqualSid(const_cast<SID*>(sid),diagnosticPackageSid))grantPresent=true;}
+  const auto bytes=reinterpret_cast<const unsigned char*>(acl);
+  return "{\"revision\":"+std::to_string(acl->AclRevision)+",\"size\":"+std::to_string(acl->AclSize)+",\"aceCount\":"+std::to_string(size.AceCount)+",\"bytesInUse\":"+std::to_string(size.AclBytesInUse)+",\"bytesFree\":"+std::to_string(size.AclBytesFree)
+    +",\"fullSha256\":"+AclDiagnosticHash(bytes,acl->AclSize)+",\"usedSha256\":"+AclDiagnosticHash(bytes,size.AclBytesInUse)+",\"orderedAceBytesSha256\":"+(size.AclBytesInUse>=sizeof(ACL)?AclDiagnosticHash(bytes+sizeof(ACL),size.AclBytesInUse-static_cast<ULONG>(sizeof(ACL))):"null")+",\"temporaryAllowAcePresent\":"+(grantPresent?"true":"false")+"}";
+}
+void AclFailure(size_t index,const GrantState& item,const std::string& observation,PACL prior,PACL current,SECURITY_DESCRIPTOR_CONTROL control){
+  try{++aclFailureCount;const auto text="{\"index\":"+std::to_string(index)+",\"directory\":"+(item.directory?"true":"false")+",\"priorControl\":"+std::to_string(item.control)+",\"currentControl\":"+std::to_string(control)+",\"observation\":"+observation+",\"prior\":"+AclDiagnostic(prior)+",\"current\":"+AclDiagnostic(current)+"}";
+    if(aclFailureItems.size()+text.size()+1>52000){++aclFailureOmitted;return;}if(!aclFailureItems.empty())aclFailureItems+=',';aclFailureItems+=text;
+  }catch(...){++aclFailureOmitted;}
+}
+void RecordAclCleanupDiagnostics(bool restored,bool normalized){
+  if(restored&&normalized)return;
+  try{Record(L"acl-diagnostics",std::string("{\"schema\":\"aaw.native.acl-cleanup-diagnostic/v1\",\"restoreGrants\":")+(restored?"true":"false")+",\"normalizeOutput\":"+(normalized?"true":"false")+",\"failureCount\":"+std::to_string(aclFailureCount)+",\"omitted\":"+std::to_string(aclFailureOmitted)+",\"failures\":["+aclFailureItems+"],\"output\":"+outputCleanupDiagnostic+"}");}catch(...){}
+}
 std::vector<unsigned char> userInfo;
 PSID MainUser(){return reinterpret_cast<TOKEN_USER*>(userInfo.data())->User.Sid;}
 bool SameIdentity(const GrantState& item){FILE_ID_INFO now{};return GetFileInformationByHandleEx(item.handle.h,FileIdInfo,&now,sizeof(now))&&now.VolumeSerialNumber==item.identity.VolumeSerialNumber&&std::memcmp(now.FileId.Identifier,item.identity.FileId.Identifier,16)==0;}
 HANDLE Grant(const std::wstring& name,bool directory,PSID sid,DWORD mask,bool immutable){
+  diagnosticPackageSid=sid;
   Handle object=Open(name,directory,WRITE_DAC|(immutable?GENERIC_READ:0),immutable);
   PSECURITY_DESCRIPTOR descriptor=nullptr;PACL prior=nullptr;Check(GetSecurityInfo(object.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&prior,nullptr,&descriptor)==ERROR_SUCCESS,"read_acl");
   GrantState state;state.handle=std::move(object);state.descriptor=descriptor;state.path=name;state.directory=directory;
@@ -168,16 +205,23 @@ HANDLE Grant(const std::wstring& name,bool directory,PSID sid,DWORD mask,bool im
   return saved.handle.h;
 }
 bool RestoreGrants(){
-  bool okay=true;
+  bool okay=true;aclFailureItems.clear();aclFailureCount=0;aclFailureOmitted=0;
   // Parent restoration can propagate to children. Restore every object, then verify every final state.
-  for(auto& item:grants){PACL prior=nullptr;BOOL present=FALSE,defaulted=FALSE;
+  for(size_t index=0;index<grants.size();++index){auto& item=grants[index];PACL prior=nullptr;BOOL present=FALSE,defaulted=FALSE;
     const auto flags=DACL_SECURITY_INFORMATION|((item.control&SE_DACL_PROTECTED)?PROTECTED_DACL_SECURITY_INFORMATION:UNPROTECTED_DACL_SECURITY_INFORMATION);
-    if(!SameIdentity(item)||!GetSecurityDescriptorDacl(item.descriptor,&present,&prior,&defaulted)||!present||!prior||SetSecurityInfo(item.handle.h,SE_FILE_OBJECT,flags,nullptr,nullptr,prior,nullptr)!=ERROR_SUCCESS)okay=false;
+    SetLastError(ERROR_SUCCESS);const bool identity=SameIdentity(item);const DWORD identityError=identity?ERROR_SUCCESS:GetLastError();
+    SetLastError(ERROR_SUCCESS);const bool read=identity&&GetSecurityDescriptorDacl(item.descriptor,&present,&prior,&defaulted);const DWORD readError=read?ERROR_SUCCESS:GetLastError();
+    const bool called=read&&present&&prior;const DWORD applied=called?SetSecurityInfo(item.handle.h,SE_FILE_OBJECT,flags,nullptr,nullptr,prior,nullptr):ERROR_INVALID_DATA;
+    if(!called||applied!=ERROR_SUCCESS){okay=false;AclFailure(index,item,"{\"stage\":\"apply\",\"identity\":"+std::string(identity?"true":"false")+",\"identityError\":"+std::to_string(identityError)+",\"baselineRead\":"+(read?"true":"false")+",\"baselineError\":"+std::to_string(readError)+",\"setCalled\":"+(called?"true":"false")+",\"setCode\":"+std::to_string(applied)+",\"flags\":"+std::to_string(flags)+"}",prior,nullptr,0);}
   }
-  for(auto& item:grants){PACL prior=nullptr,current=nullptr;PSECURITY_DESCRIPTOR actual=nullptr;BOOL present=FALSE,defaulted=FALSE;SECURITY_DESCRIPTOR_CONTROL control{};DWORD revision=0;
-    bool equal=SameIdentity(item)&&GetSecurityDescriptorDacl(item.descriptor,&present,&prior,&defaulted)&&GetSecurityInfo(item.handle.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&current,nullptr,&actual)==ERROR_SUCCESS;
-    if(equal)equal=GetSecurityDescriptorControl(actual,&control,&revision)&&((control^item.control)&(SE_DACL_PROTECTED|SE_DACL_AUTO_INHERITED))==0&&prior&&current&&prior->AclSize==current->AclSize&&std::memcmp(prior,current,prior->AclSize)==0;
-    if(actual)LocalFree(actual);if(!equal)okay=false;
+  for(size_t index=0;index<grants.size();++index){auto& item=grants[index];PACL prior=nullptr,current=nullptr;PSECURITY_DESCRIPTOR actual=nullptr;BOOL present=FALSE,defaulted=FALSE;SECURITY_DESCRIPTOR_CONTROL control{};DWORD revision=0;
+    SetLastError(ERROR_SUCCESS);const bool identity=SameIdentity(item);const DWORD identityError=identity?ERROR_SUCCESS:GetLastError();
+    SetLastError(ERROR_SUCCESS);const bool read=identity&&GetSecurityDescriptorDacl(item.descriptor,&present,&prior,&defaulted);const DWORD readError=read?ERROR_SUCCESS:GetLastError();
+    const DWORD queried=read?GetSecurityInfo(item.handle.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&current,nullptr,&actual):ERROR_INVALID_DATA;
+    bool equal=read&&queried==ERROR_SUCCESS,controlled=false;DWORD controlError=ERROR_SUCCESS;
+    if(equal){SetLastError(ERROR_SUCCESS);controlled=GetSecurityDescriptorControl(actual,&control,&revision);controlError=controlled?ERROR_SUCCESS:GetLastError();equal=controlled&&((control^item.control)&(SE_DACL_PROTECTED|SE_DACL_AUTO_INHERITED))==0&&prior&&current&&prior->AclSize==current->AclSize&&std::memcmp(prior,current,prior->AclSize)==0;}
+    if(!equal){okay=false;AclFailure(index,item,"{\"stage\":\"verify\",\"identity\":"+std::string(identity?"true":"false")+",\"identityError\":"+std::to_string(identityError)+",\"baselineRead\":"+(read?"true":"false")+",\"baselineError\":"+std::to_string(readError)+",\"queryCode\":"+std::to_string(queried)+",\"controlRead\":"+(controlled?"true":"false")+",\"controlError\":"+std::to_string(controlError)+"}",prior,current,control);}
+    if(actual)LocalFree(actual);
   }return okay;
 }
 void ReleaseGrants(){for(auto& item:grants){if(item.descriptor)LocalFree(item.descriptor);item.descriptor=nullptr;}grants.clear();}
@@ -201,13 +245,16 @@ void Walk(const std::wstring& root,const std::wstring& relative,std::vector<Tree
   }catch(...){FindClose(raw);throw;}
 }
 bool NormalizeOutput(const std::wstring& output){
+  const char* stage="baseline";size_t count=0;DWORD code=ERROR_SUCCESS;
   try{
     const auto found=std::find_if(grants.begin(),grants.end(),[&](const GrantState& item){return item.path==output;});
-    if(found==grants.end())return true;
+    if(found==grants.end()){outputCleanupDiagnostic="{\"stage\":\"not_granted\",\"code\":0,\"entryCount\":0}";return true;}
     PACL baseline=nullptr;BOOL present=FALSE,defaulted=FALSE;Check(GetSecurityDescriptorDacl(found->descriptor,&present,&baseline,&defaulted)&&present&&baseline,"output_baseline");
-    std::vector<TreeEntry> entries;Walk(output,L"",entries);
-    for(const auto& entry:entries){auto object=Open(output+L"\\"+NativeRelative(entry.relative),entry.directory,WRITE_DAC);Check(SetSecurityInfo(object.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION|UNPROTECTED_DACL_SECURITY_INFORMATION,nullptr,nullptr,baseline,nullptr)==ERROR_SUCCESS,"output_acl");}
+    stage="enumerate";std::vector<TreeEntry> entries;Walk(output,L"",entries);count=entries.size();
+    for(const auto& entry:entries){stage="open_output";auto object=Open(output+L"\\"+NativeRelative(entry.relative),entry.directory,WRITE_DAC);stage="set_output_acl";code=SetSecurityInfo(object.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION|UNPROTECTED_DACL_SECURITY_INFORMATION,nullptr,nullptr,baseline,nullptr);Check(code==ERROR_SUCCESS,"output_acl");}
+    outputCleanupDiagnostic="{\"stage\":\"complete\",\"code\":0,\"entryCount\":"+std::to_string(count)+"}";
     return true;
-  }catch(...){return false;}
+  }catch(const std::exception& error){try{if(code==ERROR_SUCCESS){const std::string message(error.what());const auto separator=message.rfind(':');if(separator!=std::string::npos){const auto number=message.substr(separator+1);if(!number.empty()&&number.size()<=10&&number.find_first_not_of("0123456789")==std::string::npos)code=std::stoul(number);}}outputCleanupDiagnostic="{\"stage\":\""+std::string(stage)+"\",\"code\":"+std::to_string(code)+",\"entryCount\":"+std::to_string(count)+"}";}catch(...){}return false;
+  }catch(...){outputCleanupDiagnostic="{\"stage\":\"unknown\",\"code\":null}";return false;}
 }
 } // namespace aaw

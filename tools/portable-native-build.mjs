@@ -26,7 +26,7 @@ function shellProfile(root) {
 }
 function write(file,text){fs.writeFileSync(file,text,{flag:'wx'});return file;}
 const DIAGNOSTIC_BYTES=16384;
-const SELF_TEST_RECORDS={work:['native-claim','profile-intent','profile-owned','started','cleanup','cleanup-failed'],guardian:['intent','ready','result']};
+const SELF_TEST_RECORDS={work:['native-claim','profile-intent','profile-owned','started','cleanup','cleanup-failed','acl-diagnostics'],guardian:['intent','ready','result']};
 function boundedNativeRecord(file) {
   const before=ordinary(file);if(before.size>65536)throw Error('DIAGNOSTIC_RECORD_LIMIT');
   const descriptor=fs.openSync(file,'r');

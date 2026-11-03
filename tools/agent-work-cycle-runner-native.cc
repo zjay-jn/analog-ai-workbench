@@ -103,8 +103,9 @@ int wmain(int argc,wchar_t** argv){
       if(empty)job.Reset();
     }
     if(!empty)return false;
-    if(!RestoreGrants())aclFailure=true;
-    if(!request.output.empty()&&!NormalizeOutput(request.output))aclFailure=true;
+    const bool restored=RestoreGrants();if(!restored)aclFailure=true;
+    const bool normalized=request.output.empty()||NormalizeOutput(request.output);if(!normalized)aclFailure=true;
+    RecordAclCleanupDiagnostics(restored,normalized);
     aclRestored=!aclFailure;ReleaseGrants();
     if(profileCreated){if(FAILED(DeleteAppContainerProfile(moniker.c_str())))return false;profileCreated=false;profileDeleted=true;}else if(!claimed)profileDeleted=true;
     return aclRestored&&profileDeleted;

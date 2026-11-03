@@ -11,12 +11,14 @@ function fixture(){const folder=fs.mkdtempSync(path.join(temporary,'case-')),run
 
 test('failed work evidence retains bounded report, errors and actual cleanup flags before throwing',()=>{
   const {paths,records}=fixture();fs.writeFileSync(path.join(records,'cleanup-failed.json'),JSON.stringify({cleanupConfirmed:false,activeProcesses:2}));fs.writeFileSync(path.join(records,'config.json'),'SYNTHETIC_NOT_FOR_UPLOAD');
+  const aclDiagnostic={schema:'aaw.native.acl-cleanup-diagnostic/v1',restoreGrants:false,normalizeOutput:true,failures:[{index:0,directory:true,priorControl:4,currentControl:1028,observation:{stage:'verify',queryCode:0},prior:{size:64,bytesInUse:60},current:{size:60,bytesInUse:60}}]};fs.writeFileSync(path.join(records,'acl-diagnostics.json'),JSON.stringify(aclDiagnostic));
   const report={version:1,termination:'isolation_failed',exitCode:null,cleanupConfirmed:false,activeProcesses:2,aclRestored:false,profileDeleted:false};
   const result=persistNativeSelfTestDiagnostics(paths,{kind:'work',buildId:'synthetic',executionId:'synthetic-id',recordRoot:records,received:{code:0,closed:true,stdout:JSON.stringify(report),stderr:'create_process:5\n'},report,okay:false,failures:['termination','exit_code','cleanup']});
   const output=path.join(paths.root,result.directory),saved=JSON.parse(fs.readFileSync(path.join(output,'result.json'),'utf8'));
   assert.equal(saved.status,'FAIL');assert.equal(saved.exitCode,0);assert.equal(saved.cleanup.confirmed,false);assert.equal(saved.cleanup.activeProcesses,2);assert(saved.failures.includes('cleanup'));
   assert.equal(fs.readFileSync(path.join(output,'stderr.txt'),'utf8'),'create_process:5\n');assert.deepEqual(JSON.parse(fs.readFileSync(path.join(output,'report.json'),'utf8')),report);
   assert(fs.existsSync(path.join(output,'native-record-cleanup-failed.json')));assert.equal(fs.existsSync(path.join(output,'config.json')),false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(output,'native-record-acl-diagnostics.json'),'utf8')),aclDiagnostic);
 });
 test('malformed/oversized output and records cannot grow an artifact without a limit',()=>{
   const {paths,records}=fixture();fs.writeFileSync(path.join(records,'native-claim.json'),'x'.repeat(65537));
