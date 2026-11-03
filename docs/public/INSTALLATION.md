@@ -26,7 +26,7 @@ Conversations, settings, workspaces, command logs, local admission evidence and 
 
 This is separate from the installed program files. Close the workbench before installing an update or uninstalling. The installer checks the fixed destination, product marker, path identities and known payload files before changing program files.
 
-Uninstall through Windows Installed apps or the workbench's uninstall shortcut. Uninstall removes the known application payload, shortcuts and current-user uninstall registration. It preserves the user data directory and unknown files in the installation directory; a directory containing such files may remain.
+To uninstall, open Windows Settings, select Apps → Installed apps, find Analog AI Workbench and choose Uninstall. This removes the known application files, both launch shortcuts and the current-user uninstall registration. It preserves the user data directory and any unknown files in the installation directory.
 
 The installed application uses fixed current-user locations; the source-only `--storage-root` option below is not an installer destination or packaged data override. A changed package or machine profile requires matching local runtime verification. Do not copy a development runtime manifest or another machine's admission into the installed application.
 

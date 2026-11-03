@@ -6,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {parseInstalledSmokeOptions, installedSmokeEnvironment, validateInstalledProfile, validateInstalledReady,
   validateInstalledAddon, installedFreshBootName, installedOwnershipKey, validateInstalledOwnership, installedRendererMatches,
-  checkoutRoot} from '../tools/installed-desktop-smoke.mjs';
+  installedFailureSnapshot, installedFailureDiagnostics, checkoutRoot} from '../tools/installed-desktop-smoke.mjs';
 import {assertFirstProfile} from '../tools/portable-desktop-smoke.mjs';
 
 const digest = 'a'.repeat(64), other = 'b'.repeat(64);
@@ -126,4 +126,29 @@ test('first-profile checks preserve occupied synthetic stores and refuse aliases
   const outside = path.join(root, 'synthetic-outside'); fs.mkdirSync(outside);
   const alias = path.join(root, 'alias'); fs.symlinkSync(outside, alias, process.platform === 'win32' ? 'junction' : 'dir');
   assert.throws(() => assertFirstProfile(alias), /SMOKE_SCOPE_ALIASED/); assert.deepEqual(fs.readdirSync(outside), []);
+});
+
+test('failure diagnostics retain only this launch stage codes, including launcher failure before final result', () => {
+  const root = path.join(checkoutRoot, '.local/installed-smoke-unit/diagnostic-' + randomUUID()), ctx = context();
+  ctx.nativeProfile.profile.storageRoot = path.join(root, 'AnalogAIWorkbench'); ctx.nativeProfile.profile.dataRoot = path.join(ctx.nativeProfile.profile.storageRoot, '.local');
+  const admission = path.join(ctx.nativeProfile.profile.dataRoot, 'runtime-admission'), old = 'init-' + randomUUID();
+  fs.mkdirSync(path.join(admission, old), {recursive: true});
+  fs.writeFileSync(path.join(admission, old, 'result.json'), 'Do not read an older attempt');
+  const before = installedFailureSnapshot(ctx), id = randomUUID(), current = path.join(admission, 'init-' + id);
+  fs.mkdirSync(current); fs.writeFileSync(path.join(current, 'request.json'), JSON.stringify({schemaVersion: 'aaw.packaged-init-request/v1',
+    packageManifestSha256: digest, profileRevision: digest, attemptId: id, installationRoot: install,
+    storageRoot: ctx.nativeProfile.profile.storageRoot, dataRoot: ctx.nativeProfile.profile.dataRoot}));
+  fs.writeFileSync(path.join(current, 'launcher.json'), JSON.stringify({schemaVersion: 'aaw.packaged-init-launcher/v1', status: 'NOT_READY',
+    stdout: 'PRIVATE_SYNTHETIC_STDOUT', stderr: 'PRIVATE_SYNTHETIC_STDERR\nPACKAGED_NODE_REQUIRED\n', profile: 'PRIVATE_SYNTHETIC_PROFILE'}));
+  const boot = path.join(admission, 'boots', 'boot-' + randomUUID()); fs.mkdirSync(boot, {recursive: true});
+  fs.writeFileSync(path.join(boot, 'addon-loaded.json'), JSON.stringify({schemaVersion: 'aaw.packaged-electron-addon/v1', status: 'PASS', pin: 'PRIVATE_SYNTHETIC_PIN'}));
+  const result = installedFailureDiagnostics(ctx, before, 'first'), serialized = JSON.stringify(result);
+  assert.equal(result.status, 'COLLECTED'); assert.equal(result.records.find(item => item.source === 'initializer-launcher').code, 'PACKAGED_NODE_REQUIRED');
+  assert.equal(result.records.find(item => item.source === 'initialization-result').status, 'MISSING');
+  assert.equal(result.records.find(item => item.source === 'electron-addon').status, 'PASS');
+  assert.doesNotMatch(serialized, /PRIVATE_SYNTHETIC|Do not read|stdout|stderr|profile|pin|[A-Z]:\\/u);
+  assert.equal(installedFailureDiagnostics(ctx, null, 'first').status, 'UNAVAILABLE');
+  fs.mkdirSync(path.join(admission, 'init-' + randomUUID()));
+  const ambiguous = installedFailureDiagnostics(ctx, before, 'first');
+  assert.equal(ambiguous.code, 'DIAGNOSTIC_LAUNCH_AMBIGUOUS'); assert.deepEqual(ambiguous.records, []);
 });

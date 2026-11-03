@@ -41,7 +41,7 @@ export function installerSmokeEnvironment(folders,systemRoot){
   requireOkay(['profile','localAppData','roamingAppData','temporaryDirectory'].every(key=>absolute(folders[key]))&&absolute(systemRoot),'SMOKE_OS_ENVIRONMENT');
   return {SystemRoot:systemRoot,windir:systemRoot,SystemDrive:path.parse(systemRoot).root.slice(0,2),PATH:path.join(systemRoot,'System32'),ComSpec:path.join(systemRoot,'System32/cmd.exe'),PATHEXT:'.COM;.EXE;.BAT;.CMD',USERPROFILE:folders.profile,APPDATA:folders.roamingAppData,LOCALAPPDATA:folders.localAppData,HOMEDRIVE:path.parse(folders.profile).root.slice(0,2),HOMEPATH:folders.profile.slice(2),TEMP:folders.temporaryDirectory,TMP:folders.temporaryDirectory};
 }
-export const INSTALLER_METADATA_TIMEOUT_MS=60000;
+export const INSTALLER_METADATA_TIMEOUT_MS=120000;
 export function installerSmokeBootstrapEnvironment(systemRoot,temporaryDirectory){
   requireOkay(absolute(systemRoot)&&absolute(temporaryDirectory),'SMOKE_OS_ENVIRONMENT');
   return {SystemRoot:systemRoot,windir:systemRoot,SystemDrive:path.parse(systemRoot).root.slice(0,2),PATH:path.join(systemRoot,'System32'),ComSpec:path.join(systemRoot,'System32/cmd.exe'),PATHEXT:'.COM;.EXE;.BAT;.CMD',TEMP:temporaryDirectory,TMP:temporaryDirectory};
@@ -58,14 +58,16 @@ $identity=[Security.Principal.WindowsIdentity]::GetCurrent();$bytes=New-Object b
 [ordered]@{localAppData=[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData);roamingAppData=[Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData);desktop=[Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory);programs=[Environment]::GetFolderPath([Environment+SpecialFolder]::Programs);profile=[Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile);userSidSha256=$sidHash}|ConvertTo-Json -Compress`;
 function registrationScript(folders){return String.raw`[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 $views=@();foreach($view in @([Microsoft.Win32.RegistryView]::Registry32,[Microsoft.Win32.RegistryView]::Registry64)){$base=[Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,$view);$key=$base.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\AnalogAIWorkbench',$false);$row=[ordered]@{view=$view.ToString();present=($null -ne $key)};if($null -ne $key){foreach($name in @('DisplayName','DisplayVersion','InstallLocation','UninstallString','QuietUninstallString')){$row[$name]=$key.GetValue($name)};$key.Dispose()};$base.Dispose();$views+=,$row}
-$shell=New-Object -ComObject WScript.Shell;$links=@();foreach($file in @(`+[path.join(folders.desktop,'Analog AI Workbench.lnk'),path.join(folders.programs,'Analog AI Workbench/Analog AI Workbench.lnk'),path.join(folders.programs,'Analog AI Workbench/卸载.lnk')].map(psQuote).join(',')+String.raw`)){$exists=[IO.File]::Exists($file);$row=[ordered]@{path=$file;present=$exists};if($exists){$link=$shell.CreateShortcut($file);$row.target=$link.TargetPath;$row.arguments=$link.Arguments};$links+=,$row}
-[ordered]@{registry=$views;shortcuts=$links}|ConvertTo-Json -Depth 5 -Compress`;
+$shell=New-Object -ComObject WScript.Shell;$links=@();foreach($file in @(`+[path.join(folders.desktop,'Analog AI Workbench.lnk'),path.join(folders.programs,'Analog AI Workbench/Analog AI Workbench.lnk')].map(psQuote).join(',')+String.raw`)){$exists=[IO.File]::Exists($file);$row=[ordered]@{path=$file;present=$exists};if($exists){$link=$shell.CreateShortcut($file);$row.target=$link.TargetPath;$row.arguments=$link.Arguments};$links+=,$row}
+$legacyUninstallShortcut=[IO.File]::Exists(`+psQuote(path.join(folders.programs,'Analog AI Workbench/卸载.lnk'))+String.raw`)
+[ordered]@{registry=$views;shortcuts=$links;legacyUninstallShortcut=$legacyUninstallShortcut}|ConvertTo-Json -Depth 5 -Compress`;
 }
 function validateRegistration(value,installationRoot,version,present){
-  requireOkay(Array.isArray(value?.registry)&&value.registry.length===2&&Array.isArray(value.shortcuts)&&value.shortcuts.length===3,'SMOKE_REGISTRATION_INVALID');const exe=path.join(installationRoot,'AnalogAIWorkbench.exe'),uninstaller=path.join(installationRoot,UNINSTALLER);
+  requireOkay(Array.isArray(value?.registry)&&value.registry.length===2&&Array.isArray(value.shortcuts)&&value.shortcuts.length===2,'SMOKE_REGISTRATION_INVALID');const exe=path.join(installationRoot,'AnalogAIWorkbench.exe'),uninstaller=path.join(installationRoot,UNINSTALLER);
+  requireOkay(value.legacyUninstallShortcut===false,'SMOKE_LEGACY_SHORTCUT_PRESENT');
   const registry=value.registry.filter(item=>item.present);if(!present){requireOkay(registry.length===0&&value.shortcuts.every(item=>!item.present),'SMOKE_REGISTRATION_REMAINS');return;}
   requireOkay(registry.length>=1,'SMOKE_REGISTRY_MISSING');for(const item of registry)requireOkay(item.DisplayName==='Analog AI Workbench'&&item.DisplayVersion===version&&samePath(item.InstallLocation,installationRoot)&&item.UninstallString?.toLowerCase()===('"'+uninstaller+'"').toLowerCase()&&item.QuietUninstallString?.toLowerCase()===('"'+uninstaller+'" /S').toLowerCase(),'SMOKE_REGISTRY_CHANGED');
-  value.shortcuts.forEach((item,index)=>{requireOkay(item.present&&samePath(item.target,index===2?uninstaller:exe)&&item.arguments==='','SMOKE_SHORTCUT_CHANGED');ordinary(item.path);});
+  value.shortcuts.forEach(item=>{requireOkay(item.present&&typeof item.target==='string'&&item.target.length>0&&samePath(item.target,exe)&&item.arguments==='','SMOKE_SHORTCUT_CHANGED');ordinary(item.path);});
 }
 
 export async function runWindowsInstallerSmoke({buildResult}){

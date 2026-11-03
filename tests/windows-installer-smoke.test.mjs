@@ -54,7 +54,7 @@ test('initial metadata environment bootstraps only pinned OS locations and owned
   const directory=fixture(),system=path.join(directory,'Windows'),temporary=path.join(directory,'owned-temp'),env=installerSmokeBootstrapEnvironment(system,temporary);
   assert.deepEqual(Object.keys(env).sort(),['SystemRoot','windir','SystemDrive','PATH','ComSpec','PATHEXT','TEMP','TMP'].sort());assert.equal(env.SystemRoot,system);assert.equal(env.windir,system);assert.equal(env.PATH,path.join(system,'System32'));assert.equal(env.TEMP,temporary);assert.equal(env.TMP,temporary);
   for(const key of ['USERPROFILE','APPDATA','LOCALAPPDATA','NODE_OPTIONS','PYTHONPATH','VSINSTALLDIR','GH_TOKEN'])assert.equal(Object.hasOwn(env,key),false);
-  assert.equal(INSTALLER_METADATA_TIMEOUT_MS,60000);assert.throws(()=>installerSmokeBootstrapEnvironment('relative',temporary),/SMOKE_OS_ENVIRONMENT/);assert.throws(()=>installerSmokeBootstrapEnvironment(system,'relative'),/SMOKE_OS_ENVIRONMENT/);
+  assert.equal(INSTALLER_METADATA_TIMEOUT_MS,120000);assert.throws(()=>installerSmokeBootstrapEnvironment('relative',temporary),/SMOKE_OS_ENVIRONMENT/);assert.throws(()=>installerSmokeBootstrapEnvironment(system,'relative'),/SMOKE_OS_ENVIRONMENT/);
 });
 test('actual readonly KnownFolder script returns normal JSON with only the OS bootstrap environment',{skip:process.platform!=='win32'},()=>{
   const directory=fixture(),temporary=path.join(directory,'owned-temp');fs.mkdirSync(temporary);ordinary(temporary,true);

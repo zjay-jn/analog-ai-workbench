@@ -162,6 +162,65 @@ function freshAddon(context, previous) {
   return {...validateInstalledAddon(json(path.join(context.nativeProfile.profile.dataRoot, 'runtime-admission/boots', boot, 'addon-loaded.json')), context.addonPin), boot};
 }
 
+function admissionNames(directory) {
+  assertUnaliased(directory);
+  if (!fs.existsSync(directory)) return [];
+  const names = fs.readdirSync(directory);
+  if (names.length > 256) throw Error('DIAGNOSTIC_ENTRY_LIMIT');
+  return names;
+}
+/** Call only after the fresh-profile or exact cold-ownership guard has passed. */
+export function installedFailureSnapshot(context) {
+  const directory = path.join(context.nativeProfile.profile.dataRoot, 'runtime-admission');
+  try {return {directory, entries: admissionNames(directory), boots: admissionNames(path.join(directory, 'boots'))};}
+  catch {return null;}
+}
+
+/** Copy bounded stage metadata from this launch only, never a profile, log, native record or proof. */
+export function installedFailureDiagnostics(context, before, phase) {
+  const summary = {schemaVersion: 'aaw.installed-startup-diagnostics/v1', status: 'COLLECTED', phase, records: []};
+  const directory = path.join(context.nativeProfile.profile.dataRoot, 'runtime-admission');
+  if (!before || before.directory !== directory || !['first', 'cold'].includes(phase)) return {...summary, status: 'UNAVAILABLE', code: 'DIAGNOSTIC_SCOPE_UNAVAILABLE'};
+  const code = value => typeof value === 'string' && /^PACKAGED_[A-Z0-9_]{1,80}$/u.test(value) ? value : null;
+  const stages = new Set(['initializing', 'failed', 'electron-addon-load', 'native-self-tests', 'command-self-tests', 'final-binding-check', 'production-factory-registration']);
+  const metadata = (file, source, schemas, fixedPhase, launcher = false) => {
+    try {
+      const value = JSON.parse(read(file, launcher ? 1024 * 1024 : 256 * 1024).toString('utf8'));
+      const schema = value.schemaVersion ?? value.schema;
+      if (!schemas.includes(schema) || !['PASS', 'FAIL', 'READY', 'NOT_READY'].includes(value.status)) throw Error('DIAGNOSTIC_METADATA_INVALID');
+      const item = {source, schemaVersion: schema, status: value.status, phase: stages.has(value.stage) ? value.stage : fixedPhase,
+        code: code(value.code) ?? code(value.failure)};
+      // An initializer can fail before its try/catch and never write result.json.
+      // launcher.stderr is inspected for its fixed error code only; its text is never copied.
+      if (launcher && typeof value.stderr === 'string') item.code ??= value.stderr.split(/\r?\n/u).map(line => code(line.trim())).find(Boolean) ?? null;
+      summary.records.push(item);
+    } catch (error) {
+      summary.records.push({source, status: error.code === 'ENOENT' ? 'MISSING' : 'UNAVAILABLE', phase: fixedPhase, code: null});
+    }
+  };
+  try {
+    const freshBoots = admissionNames(path.join(directory, 'boots')).filter(name => !before.boots.includes(name) && name.startsWith('boot-') && uuidPattern.test(name.slice(5)));
+    const freshAttempts = admissionNames(directory).filter(name => !before.entries.includes(name) && name.startsWith('init-') && uuidPattern.test(name.slice(5)));
+    // A single launch creates at most one boot and one initialization attempt.
+    if (freshBoots.length > 1 || freshAttempts.length > 1) return {...summary, status: 'UNAVAILABLE', code: 'DIAGNOSTIC_LAUNCH_AMBIGUOUS'};
+    for (const name of freshBoots) metadata(path.join(directory, 'boots', name, 'addon-loaded.json'), 'electron-addon', ['aaw.packaged-electron-addon/v1'], 'electron-addon-load');
+    for (const name of freshAttempts) {
+      const attempt = path.join(directory, name), request = JSON.parse(read(path.join(attempt, 'request.json'), 16384).toString('utf8'));
+      if (request.schemaVersion !== 'aaw.packaged-init-request/v1' || !bindings(request, context, name.slice(5), false)) {
+        summary.records.push({source: 'initialization-request', status: 'UNAVAILABLE', phase: 'initializing', code: 'DIAGNOSTIC_ATTEMPT_UNBOUND'}); continue;
+      }
+      metadata(path.join(attempt, 'launcher.json'), 'initializer-launcher', ['aaw.packaged-init-launcher/v1'], 'initializer-launch', true);
+      metadata(path.join(attempt, 'result.json'), 'initialization-result', ['aaw.packaged-initialization-result/v1', 'aaw.packaged-runtime-admission/v1'], 'initialization-finalization');
+      metadata(path.join(attempt, 'self-tests/failure.json'), 'native-self-tests-failure', ['aaw.packaged-native-self-tests/v1'], 'native-self-tests');
+      metadata(path.join(attempt, 'self-tests/work/result.json'), 'work-self-test', ['aaw.packaged-native-self-test/v1'], 'native-self-tests');
+      metadata(path.join(attempt, 'self-tests/guardian/result.json'), 'guardian-self-test', ['aaw.packaged-native-self-test/v1'], 'native-self-tests');
+      metadata(path.join(attempt, 'command-verification.json'), 'command-self-test', ['aaw.packaged-command-verification/v1'], 'command-self-tests');
+      metadata(path.join(attempt, 'factory-inspection.json'), 'factory-inspection', ['aaw.packaged-factory-inspection/v1'], 'production-factory-registration');
+    }
+  } catch {summary.status = 'UNAVAILABLE'; summary.code = 'DIAGNOSTIC_METADATA_UNAVAILABLE';}
+  return summary;
+}
+
 export function installedOwnershipKey(context) {
   return hash(JSON.stringify([path.resolve(context.appRoot).toLowerCase(), path.resolve(context.nativeProfile.profile.storageRoot).toLowerCase(), context.nativeProfile.profile.userSidSha256]));
 }
@@ -234,6 +293,7 @@ async function launch(context, current, marker, output) {
   const {options, nativeProfile} = context;
   if (current === 'first') assertFirstProfile(nativeProfile.profile.storageRoot);
   const previousBoots = bootNames(context), folder = path.join(output, current); mkdir(folder);
+  const diagnosticSnapshot = installedFailureSnapshot(context);
   const temporary = path.join(folder, 'temp'); mkdir(temporary);
   const port = await freePort(), report = {phase: current, status: 'RUNNING', stage: 'launch', executable: options.exe,
     packageSha: context.packageSha, profileRevision: nativeProfile.profileRevision, rendererNetworkAttempts: [], shutdownFailures: [],
@@ -330,6 +390,7 @@ async function launch(context, current, marker, output) {
         if (report.bootstrapAfterClose.attemptId !== report.bootstrap.attemptId) throw Error('PACKAGED_ATTEMPT_CHANGED');
       } catch {report.status = 'FAIL'; report.error = 'PACKAGED_COMMIT_CHANGED_DURING_CLOSE';}
     }
+    if (report.status === 'FAIL') report.startupDiagnostics = installedFailureDiagnostics(context, diagnosticSnapshot, current);
     page?.close(); browser?.close();
     if (!closed) {child.unref(); child.stdout.destroy(); child.stderr.destroy();}
     fs.writeFileSync(path.join(folder, 'stdout.log'), stdout, {flag: 'wx'}); fs.writeFileSync(path.join(folder, 'stderr.log'), stderr, {flag: 'wx'});

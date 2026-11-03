@@ -20,6 +20,12 @@ test('generated install and uninstall remain user scoped and fail closed without
   assert(!/RMDir\s+\/r|Delete\s+"[^"\n]*\*|File\s+\/r|HKLM|REBOOTOK/iu.test(script));
   assert.equal((script.match(/SetShellVarContext current/gu)??[]).length,2);assert(script.includes('RequestExecutionLevel user'));assert(script.includes('CRCCheck force'));
   assert(script.includes('validate-install "$INSTDIR"'));assert(script.includes('validate-uninstall "$INSTDIR"'));
+  assert.deepEqual(script.split('\n').map(line=>line.trim()).filter(line=>line.startsWith('CreateShortcut ')),[
+    'CreateShortcut "$SMPROGRAMS\\Analog AI Workbench\\Analog AI Workbench.lnk" "$INSTDIR\\AnalogAIWorkbench.exe"',
+    'CreateShortcut "$DESKTOP\\Analog AI Workbench.lnk" "$INSTDIR\\AnalogAIWorkbench.exe"',
+  ]);
+  assert(script.includes('StrCmp $0 "$INSTDIR" 0 create_shortcuts\n  IfFileExists "$SMPROGRAMS\\Analog AI Workbench\\卸载.lnk" 0 create_shortcuts'));
+  assert(script.includes('"QuietUninstallString"'));
   assert.equal((script.match(/IfErrors invalid_root/gu)??[]).length,2);assert(script.includes('StrCmp $1 0 remove_registration'));
   assert.equal((script.match(/InitPluginsDir\n  SetOutPath "\$PLUGINSDIR"\n  File \/oname=preflight.exe/gu)??[]).length,2);
   assert(!script.includes('Delete "$APPDATA'));assert(script.includes('Delete "$INSTDIR\\resources\\app\\package.json"'));

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aaw.public-source-export/v1",
   "policySha256": "deef0dfa69e58ccd0a2fb423143c671bcb0e59bdf8aa30f671a10b8e735fab3b",
-  "planSha256": "e58221553fdeaa817815a76af84a4842216901bfb403a2f583742555d4a31792",
+  "planSha256": "f3f4f27100f6c73d635e3d198d76fb63baef425de3da6d69c63f9753c59b6c23",
   "files": [
     {
       "source": ".gitattributes",
@@ -12,8 +12,8 @@
     {
       "source": ".github/workflows/public-source.yml",
       "destination": ".github/workflows/public-source.yml",
-      "bytes": 8164,
-      "sha256": "7d16a835af3cb2c4a96e2e7a48f5444d1090ab1b03f4f9aa7aa8b13cf9fd4b5e"
+      "bytes": 9360,
+      "sha256": "f9e982fb22d69f4be336cbfb6e1f296763b31f0722ba1991843f1ff63c0b1f4f"
     },
     {
       "source": ".gitignore",
@@ -1980,8 +1980,8 @@
     {
       "source": "docs/public/INSTALLATION.md",
       "destination": "docs/INSTALLATION.md",
-      "bytes": 5809,
-      "sha256": "e9c3aee8fba76e5a88ba58e94d3e8d9837b6a9b3e8a051ac7a21396617da3a12"
+      "bytes": 5812,
+      "sha256": "9fbe345bd9a42312ef3f00cff96aa7fc2ba52e9a4b03cbc44bea7263a2e8b286"
     },
     {
       "source": "docs/public/AGENTS.md",
@@ -2016,8 +2016,8 @@
     {
       "source": "docs/public/INSTALLATION.md",
       "destination": "docs/public/INSTALLATION.md",
-      "bytes": 5809,
-      "sha256": "e9c3aee8fba76e5a88ba58e94d3e8d9837b6a9b3e8a051ac7a21396617da3a12"
+      "bytes": 5812,
+      "sha256": "9fbe345bd9a42312ef3f00cff96aa7fc2ba52e9a4b03cbc44bea7263a2e8b286"
     },
     {
       "source": "docs/public/README.md",
@@ -3318,8 +3318,8 @@
     {
       "source": "tests/installed-desktop-smoke.test.mjs",
       "destination": "tests/installed-desktop-smoke.test.mjs",
-      "bytes": 11045,
-      "sha256": "6e6f61f0565cad1ad14434bd946e25cb033dfc9ce7b1e8ea534adfa4b78abf33"
+      "bytes": 13705,
+      "sha256": "e9aa6ea326e63e9f1b7eef500ad15960129ae78f42d4749b6966bba38833b1d1"
     },
     {
       "source": "tests/ipc-caller.test.ts",
@@ -4098,14 +4098,14 @@
     {
       "source": "tests/windows-installer-smoke.test.mjs",
       "destination": "tests/windows-installer-smoke.test.mjs",
-      "bytes": 12585,
-      "sha256": "d4dd92474853c46202e98d92162f907f4b8d17b26e050654db813131af2243ee"
+      "bytes": 12586,
+      "sha256": "be120c8af129a4de49501a4c737ee899ab1d2a677e8d15cfb22faa961a2a519b"
     },
     {
       "source": "tests/windows-package.test.mjs",
       "destination": "tests/windows-package.test.mjs",
-      "bytes": 3238,
-      "sha256": "d229dec207488a9735886ac404319100c6ac225cb4f49f6fdb4b948fa897d5db"
+      "bytes": 3769,
+      "sha256": "350962c6859081dd5c6310e983bd5b399c63f26da43cc229b0a3c3c381579d08"
     },
     {
       "source": "tests/work-cycle-unbounded.test.ts",
@@ -4332,8 +4332,8 @@
     {
       "source": "tools/installed-desktop-smoke.mjs",
       "destination": "tools/installed-desktop-smoke.mjs",
-      "bytes": 30864,
-      "sha256": "df1777c3f50e50f480a5b0d8ffd475d1c1a1b7a51d8077654ed2a2fbb85ac615"
+      "bytes": 36034,
+      "sha256": "8b69f5178fd5c0958b716f4181a56357d21c9e52708081eb385415bb1f9507b1"
     },
     {
       "source": "tools/license-inventory.mjs",
@@ -4686,14 +4686,14 @@
     {
       "source": "tools/windows-installer-script.mjs",
       "destination": "tools/windows-installer-script.mjs",
-      "bytes": 7763,
-      "sha256": "18ed31e806123c62bccdbe718d21a262ea06259ebe0289612f1d74b2141e4608"
+      "bytes": 8077,
+      "sha256": "4a6b1d499dafbb2d73661fbf3b5578363cfd5ab3264b3a55d420c7e6d28ad64a"
     },
     {
       "source": "tools/windows-installer-smoke.mjs",
       "destination": "tools/windows-installer-smoke.mjs",
-      "bytes": 22552,
-      "sha256": "f1c48d30af99ac11d2d5b038fdbc968cf0a14f7d14ce8f24bfb7f47ee0dd4397"
+      "bytes": 22778,
+      "sha256": "35546d8a98ebff9e8e7aea6e9f5b26bba84dd9e81c13f1101324e1618c7d521f"
     },
     {
       "source": "tools/windows-package.mjs",

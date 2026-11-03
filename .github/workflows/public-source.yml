@@ -156,7 +156,25 @@ jobs:
       - name: Install, launch twice, reinstall and uninstall without development tools on PATH
         run: |
           node tools/windows-installer-smoke.mjs "--build-result=$env:AAW_INSTALLER_RESULT"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $smokeExit = $LASTEXITCODE
+          if ($smokeExit -ne 0) {
+            foreach ($file in (Get-ChildItem .local/installer-smoke/run-*/summary.json -ErrorAction SilentlyContinue)) {
+              $summary = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+              Write-Host "Installer stage=$($summary.stage)"
+              if ($summary.error.message -cmatch '^[A-Za-z0-9_-]{1,120}$') { Write-Host "Installer error=$($summary.error.message)" }
+            }
+            foreach ($file in (Get-ChildItem .local/installed-ui-smoke/evidence/run-*/summary.json -ErrorAction SilentlyContinue)) {
+              $summary = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+              foreach ($phase in $summary.results) {
+                Write-Host "Desktop phase=$($phase.phase) stage=$($phase.stageBeforeClose) status=$($phase.status)"
+                foreach ($record in $phase.startupDiagnostics.records) {
+                  Write-Host "  $($record.source) $($record.phase) $($record.status) $($record.code)"
+                }
+                if ($phase.error -cmatch '^[A-Z0-9_]{1,120}$') { Write-Host "Desktop error=$($phase.error)" }
+              }
+            }
+            exit $smokeExit
+          }
       - name: Keep the unsigned alpha installer and bounded synthetic evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -80,10 +80,18 @@ ${fileCommands}
   ClearErrors
   WriteUninstaller "$INSTDIR\\${UNINSTALLER}"
   IfErrors installation_failed
+  ReadRegStr $0 HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AnalogAIWorkbench" "InstallLocation"
+  StrCmp $0 "$INSTDIR" 0 create_shortcuts
+  IfFileExists "$SMPROGRAMS\\Analog AI Workbench\\卸载.lnk" 0 create_shortcuts
+  ClearErrors
+  Delete "$SMPROGRAMS\\Analog AI Workbench\\卸载.lnk"
+  IfErrors installation_failed
+  create_shortcuts:
+  ClearErrors
   CreateDirectory "$SMPROGRAMS\\Analog AI Workbench"
   CreateShortcut "$SMPROGRAMS\\Analog AI Workbench\\Analog AI Workbench.lnk" "$INSTDIR\\AnalogAIWorkbench.exe"
-  CreateShortcut "$SMPROGRAMS\\Analog AI Workbench\\卸载.lnk" "$INSTDIR\\${UNINSTALLER}"
   CreateShortcut "$DESKTOP\\Analog AI Workbench.lnk" "$INSTDIR\\AnalogAIWorkbench.exe"
+  IfErrors installation_failed
   WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AnalogAIWorkbench" "DisplayName" "Analog AI Workbench"
   WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AnalogAIWorkbench" "DisplayVersion" "${version}"
   WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AnalogAIWorkbench" "Publisher" "Analog AI Workbench contributors"
