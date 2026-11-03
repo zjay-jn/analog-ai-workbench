@@ -14,7 +14,7 @@
     "setup:desktop": "node tools/setup-desktop.mjs install",
     "doctor": "node tools/setup-desktop.mjs doctor",
     "verify:runtime": "node tools/verify-desktop-runtime.mjs",
-    "test:setup": "node --test tests/portable-setup.test.mjs tests/portable-desktop-smoke.test.mjs",
+    "test:setup": "node --test tests/portable-setup.test.mjs tests/portable-setup-diagnostics.test.mjs tests/portable-desktop-smoke.test.mjs",
     "release:plan": "node tools/public-release/index.mjs plan",
     "release:audit": "node tools/public-release/index.mjs audit",
     "test:release": "node --test tests/public-release.test.mjs",

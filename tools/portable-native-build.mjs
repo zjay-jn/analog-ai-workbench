@@ -25,6 +25,46 @@ function shellProfile(root) {
   return {shell,version:info.version,windows,systemFiles};
 }
 function write(file,text){fs.writeFileSync(file,text,{flag:'wx'});return file;}
+const DIAGNOSTIC_BYTES=16384;
+const SELF_TEST_RECORDS={work:['native-claim','profile-intent','profile-owned','started','cleanup','cleanup-failed'],guardian:['intent','ready','result']};
+function boundedNativeRecord(file) {
+  const before=ordinary(file);if(before.size>65536)throw Error('DIAGNOSTIC_RECORD_LIMIT');
+  const descriptor=fs.openSync(file,'r');
+  try{
+    const opened=fs.fstatSync(descriptor),bytes=Buffer.alloc(65537);let count=0;
+    while(count<bytes.length){const got=fs.readSync(descriptor,bytes,count,bytes.length-count,count);if(!got)break;count+=got;}
+    const after=ordinary(file),closed=fs.fstatSync(descriptor);
+    if(count>65536||[opened,after,closed].some(value=>value.dev!==before.dev||value.ino!==before.ino||value.size!==before.size||value.mtimeMs!==before.mtimeMs||value.ctimeMs!==before.ctimeMs)||count!==before.size)throw Error('DIAGNOSTIC_RECORD_CHANGED');
+    return bytes.subarray(0,count);
+  }finally{fs.closeSync(descriptor);}
+}
+/** Only fixed synthetic self-test records are copied; no environment/configuration or runtime binaries. */
+export function persistNativeSelfTestDiagnostics(paths,details) {
+  if(!Object.hasOwn(SELF_TEST_RECORDS,details.kind))throw Error('SELF_TEST_DIAGNOSTIC_KIND');
+  const directory=path.join(paths.runtimeRoot,'verification',details.kind+'-'+crypto.randomUUID());mkdir(directory);
+  const streams={};
+  for(const name of ['stdout','stderr']){
+    const bytes=Buffer.from(details.received?.[name]??'','utf8'),saved=bytes.subarray(0,DIAGNOSTIC_BYTES);
+    write(path.join(directory,name+'.txt'),saved);
+    streams[name]={savedBytes:saved.length,observedBytes:details.received?.[name+'ObservedBytes']??bytes.length,truncated:bytes.length>saved.length||details.received?.[name+'CaptureTruncated']===true};
+  }
+  const records=[];
+  for(const name of SELF_TEST_RECORDS[details.kind])try{
+    const bytes=boundedNativeRecord(path.join(details.recordRoot,name+'.json')),file='native-record-'+name+'.json';write(path.join(directory,file),bytes);records.push({name,file,status:'saved',bytes:bytes.length,sha256:hash(bytes)});
+  }catch(error){records.push({name,status:error.code==='ENOENT'?'missing':'unavailable',code:/^[A-Z_]+$/u.test(error.message??'')?error.message:(error.code??'UNAVAILABLE')});}
+  let reportCapture='absent';
+  if(details.report!==null&&details.report!==undefined)try{
+    const text=JSON.stringify(details.report);if(Buffer.byteLength(text)<=65536){write(path.join(directory,'report.json'),text+'\n');reportCapture='saved';}else reportCapture='limit';
+  }catch{reportCapture='unavailable';}
+  const summary={schema:'aaw.native-self-test-diagnostic/v1',kind:details.kind,status:details.okay?'PASS':'FAIL',buildId:details.buildId,executionId:details.executionId,
+    exitCode:details.received?.code??null,signal:details.received?.signal??null,closed:details.received?.closed??false,transportError:details.received?.transportError??null,
+    streams,reportCapture,failures:details.failures??[],cleanup:{confirmed:details.report?.cleanupConfirmed??false,activeProcesses:details.report?.activeProcesses??details.report?.job?.activeProcesses??null,aclRestored:details.report?.aclRestored??null,profileDeleted:details.report?.profileDeleted??null},
+    records,...(details.health?{health:details.health}:{}),scope:'Fixed synthetic self-test only; no host environment, credentials, configuration or binary contents copied.'};
+  write(path.join(directory,'result.json'),JSON.stringify(summary,null,2)+'\n');
+  const relative=path.relative(paths.root,directory).replaceAll('\\','/');
+  if(!details.okay)console.error(JSON.stringify({status:'FAIL',selfTest:details.kind,evidence:relative,failures:summary.failures,exitCode:summary.exitCode,cleanupConfirmed:summary.cleanup.confirmed}));
+  return {directory:relative,summary};
+}
 function compile(toolchain,output,source,name) {
   const {vc,sdkRoot,sdk,compiler}=toolchain,executable=path.join(output,name+'.exe');
   const args=['/nologo','/MT','/EHsc','/W4','/WX','/utf-8','/std:c++20','/DUNICODE','/D_UNICODE','/DAAW_PORTABLE_RUNTIME=1','/sdl','/guard:cf','/Brepro','/I'+path.join(vc,'include'),'/I'+output,
@@ -44,17 +84,23 @@ async function workSelfTest(paths,components,buildId) {
   write(path.join(input,'test.js'),program);write(path.join(runtime,'program.cjs'),program);
   fs.copyFileSync(path.join(root,components.node.path),path.join(runtime,'node.exe'),fs.constants.COPYFILE_EXCL);fs.copyFileSync(path.join(root,components.nodeLicense.path),path.join(runtime,'LICENSE'),fs.constants.COPYFILE_EXCL);
   const native=path.join(root,components.workRunner.path),arguments_=[execution,runtime,input,output,id,signature,nonce,'test.js',scriptSha,`${scriptSha}:${Buffer.byteLength(program)}:test.js`];
-  const received=await new Promise((resolve,reject)=>{
+  const received=await new Promise(resolve=>{
     const child=spawn(native,arguments_,{cwd:execution,shell:false,windowsHide:true,stdio:['pipe','pipe','pipe'],env:{SystemRoot:process.env.SystemRoot,windir:process.env.SystemRoot,SystemDrive:path.parse(process.env.SystemRoot??'C:/Windows').root.slice(0,2)}});
-    const chunks=[],errors=[];let bytes=0;const timer=setTimeout(()=>{try{child.stdin.write('C');child.stdin.end();}catch{}},25000);
-    const kill=setTimeout(()=>{child.kill();reject(Error('WORK_SELF_TEST_TIMEOUT'));},40000);
-    child.stdin.on('error',()=>{});child.stdout.on('data',chunk=>{bytes+=chunk.length;if(bytes>16384)child.stdin.end('C');else chunks.push(chunk);});child.stderr.on('data',chunk=>errors.push(chunk));
-    child.once('error',reject);child.once('close',code=>{clearTimeout(timer);clearTimeout(kill);resolve({code,stdout:Buffer.concat(chunks).toString('utf8'),stderr:Buffer.concat(errors).toString('utf8')});});
+    const chunks=[],errors=[];let bytes=0,errorBytes=0,savedErrors=0,settled=false;
+    const finish=(code,signal,closed,transportError=null)=>{if(settled)return;settled=true;clearTimeout(timer);clearTimeout(kill);resolve({code,signal,closed,transportError,stdout:Buffer.concat(chunks).toString('utf8'),stderr:Buffer.concat(errors).toString('utf8'),stdoutObservedBytes:bytes,stderrObservedBytes:errorBytes,stdoutCaptureTruncated:bytes>DIAGNOSTIC_BYTES,stderrCaptureTruncated:errorBytes>savedErrors});};
+    const timer=setTimeout(()=>{try{child.stdin.write('C');child.stdin.end();}catch{}},25000);
+    const kill=setTimeout(()=>{try{child.kill();}catch{}finish(null,null,false,'WORK_SELF_TEST_TIMEOUT');},40000);
+    child.stdin.on('error',()=>{});child.stdout.on('data',chunk=>{bytes+=chunk.length;if(bytes>16384)child.stdin.end('C');else chunks.push(chunk);});child.stderr.on('data',chunk=>{errorBytes+=chunk.length;const available=DIAGNOSTIC_BYTES-savedErrors;if(available>0){const saved=chunk.subarray(0,available);errors.push(saved);savedErrors+=saved.length;}});
+    child.once('error',error=>finish(null,null,false,error.code??'WORK_SELF_TEST_START_ERROR'));child.once('close',(code,signal)=>finish(code,signal,true));
   });
-  const report=JSON.parse(received.stdout.trim());
-  const okay=received.code===0&&report.version===1&&report.executionId===id&&report.signature===signature&&report.termination==='exited'&&report.exitCode===0
-    &&report.appContainer===true&&report.capabilityCount===0&&report.atomicJob===true&&report.lowIntegrity===true&&report.cleanupConfirmed===true&&report.aclRestored===true&&report.profileDeleted===true&&report.activeProcesses===0
-    &&report.stdoutTruncated===false&&report.stderrTruncated===false&&Buffer.from(report.stdoutHex,'hex').toString('utf8').trim()===marker&&report.stderrHex==='';
+  let report=null;try{report=JSON.parse(received.stdout.trim());}catch{}
+  if(received.transportError||report===null){persistNativeSelfTestDiagnostics(paths,{kind:'work',buildId,executionId:id,recordRoot:execution,received,report,okay:false,failures:[received.transportError??'report_json_invalid']});throw Error(received.transportError==='WORK_SELF_TEST_TIMEOUT'?'WORK_SELF_TEST_TIMEOUT':'WORK_SELF_TEST_REPORT_INVALID');}
+  let stdoutMarker=false;try{stdoutMarker=Buffer.from(report.stdoutHex,'hex').toString('utf8').trim()===marker;}catch{}
+  const checks={launcher_exit:received.code===0,report_version:report.version===1,execution_identity:report.executionId===id,signature:report.signature===signature,termination:report.termination==='exited',exit_code:report.exitCode===0,
+    appcontainer:report.appContainer===true,zero_capabilities:report.capabilityCount===0,atomic_job:report.atomicJob===true,low_integrity:report.lowIntegrity===true,cleanup:report.cleanupConfirmed===true,acl_restored:report.aclRestored===true,profile_deleted:report.profileDeleted===true,empty_job:report.activeProcesses===0,
+    stdout_complete:report.stdoutTruncated===false,stderr_complete:report.stderrTruncated===false,stdout_marker:stdoutMarker,stderr_empty:report.stderrHex===''};
+  const failures=Object.entries(checks).filter(([,okay])=>!okay).map(([name])=>name),okay=failures.length===0;
+  persistNativeSelfTestDiagnostics(paths,{kind:'work',buildId,executionId:id,recordRoot:execution,received,report,okay,failures});
   write(path.join(execution,'self-test-report.json'),JSON.stringify({received,report},null,2)+'\n');
   if(!okay)throw Error('WORK_SELF_TEST_FAILED');
   const proof={schema:'aaw.portable.work-proof.v1',status:'PASS',nativeSha256:components.workRunner.sha256,runtimeSha256:components.node.sha256,
@@ -76,14 +122,23 @@ async function guardianSelfTest(paths,components,buildId) {
     XDG_CONFIG_HOME:directories.config,XDG_DATA_HOME:directories.data,XDG_CACHE_HOME:directories.cache,XDG_STATE_HOME:directories.state,OPENCODE_TEST_HOME:directories.home,OPENCODE_TEST_MANAGED_CONFIG_DIR:directories.managed,OPENCODE_CONFIG_DIR:configDirectory,OPENCODE_MODELS_PATH:models,OPENCODE_CONFIG_CONTENT:JSON.stringify(configuration),
     OPENCODE_SERVER_USERNAME:'opencode',OPENCODE_SERVER_PASSWORD:password,npm_config_offline:'true',npm_config_audit:'false',npm_config_registry:'http://127.0.0.1:9',npm_config_cache:directories.cache,npm_config_userconfig:userNpmrc,npm_config_globalconfig:globalNpmrc};
   for(const name of ['OPENCODE_PURE','OPENCODE_DISABLE_AUTOUPDATE','OPENCODE_DISABLE_MODELS_FETCH','OPENCODE_DISABLE_PROJECT_CONFIG','OPENCODE_DISABLE_DEFAULT_PLUGINS','OPENCODE_DISABLE_CLAUDE_CODE','OPENCODE_DISABLE_EXTERNAL_SKILLS','OPENCODE_DISABLE_LSP_DOWNLOAD','OPENCODE_DISABLE_EMBEDDED_WEB_UI','OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER'])environment[name]='true';
-  const child=spawn(path.join(root,components.guardian.path),[execution,String(port)],{cwd:directories.cwd,shell:false,windowsHide:true,stdio:['pipe','pipe','pipe'],env:environment});let closed=false,exitCode=null;child.stdin.on('error',()=>{});child.stdout.resume();child.stderr.resume();
-  const exited=new Promise(resolve=>{child.once('error',()=>{closed=true;resolve();});child.once('close',code=>{closed=true;exitCode=code;resolve();});});
-  let healthy=false;const deadline=Date.now()+30000;
-  try{while(!closed&&Date.now()<deadline){try{const response=await fetch(`http://127.0.0.1:${port}/global/health`,{headers:{Authorization:'Basic '+Buffer.from('opencode:'+password).toString('base64')},signal:AbortSignal.timeout(1000),redirect:'error'});const body=await response.json();if(response.ok&&body.healthy===true&&body.version==='1.18.17'){healthy=true;break;}}catch{}await new Promise(resolve=>setTimeout(resolve,100));}}
+  const child=spawn(path.join(root,components.guardian.path),[execution,String(port)],{cwd:directories.cwd,shell:false,windowsHide:true,stdio:['pipe','pipe','pipe'],env:environment});let closed=false,exitCode=null,exitSignal=null,spawnError=null,stdoutBytes=0,stderrBytes=0;
+  child.stdin?.on('error',()=>{});child.stdout?.on('data',chunk=>{stdoutBytes+=chunk.length;});child.stderr?.on('data',chunk=>{stderrBytes+=chunk.length;});
+  const exited=new Promise(resolve=>{child.once('error',error=>{closed=true;spawnError=error.code??'GUARDIAN_START_ERROR';resolve();});child.once('close',(code,signal)=>{closed=true;exitCode=code;exitSignal=signal;resolve();});});
+  let healthy=false;const deadline=Date.now()+30000,health=[];
+  const observe=value=>{health.push(value);if(health.length>8)health.shift();};
+  try{while(!closed&&Date.now()<deadline){try{const response=await fetch(`http://127.0.0.1:${port}/global/health`,{headers:{Authorization:'Basic '+Buffer.from('opencode:'+password).toString('base64')},signal:AbortSignal.timeout(1000),redirect:'error'});const body=await response.json();observe({status:response.status,healthy:body.healthy===true,version:typeof body.version==='string'?body.version.slice(0,64):null});if(response.ok&&body.healthy===true&&body.version==='1.18.17'){healthy=true;break;}}catch(error){observe({status:null,healthy:false,version:null,error:['TimeoutError','AbortError'].includes(error.name)?error.name:'HEALTH_REQUEST_FAILED'});}await new Promise(resolve=>setTimeout(resolve,100));}}
   finally{try{child.stdin.write('C');child.stdin.end();}catch{}await Promise.race([exited,new Promise(resolve=>setTimeout(resolve,6000))]);}
-  if(!closed){child.kill();throw Error('GUARDIAN_CLEANUP_UNCONFIRMED');}
-  const result=JSON.parse(fs.readFileSync(path.join(execution,'guardian-control/result.json'),'utf8'));
-  if(!healthy||exitCode!==0||result.cleanupConfirmed!==true||result.engineExited!==true||result.job?.activeProcesses!==0||result.job.emptyConfirmed!==true||result.job.closed!==true)throw Error('GUARDIAN_SELF_TEST_FAILED');
+  if(!closed)child.kill();
+  let result=null,resultError=null;try{result=JSON.parse(boundedNativeRecord(path.join(execution,'guardian-control/result.json')).toString('utf8'));}catch(error){resultError=error.code==='ENOENT'?'GUARDIAN_RESULT_MISSING':'GUARDIAN_RESULT_INVALID';}
+  const checks={closed,healthy,launcher_exit:exitCode===0,result_present:result!==null,cleanup:result?.cleanupConfirmed===true,engine_exited:result?.engineExited===true,empty_job:result?.job?.activeProcesses===0,job_empty_confirmed:result?.job?.emptyConfirmed===true,job_closed:result?.job?.closed===true};
+  const failures=Object.entries(checks).filter(([,okay])=>!okay).map(([name])=>name),okay=failures.length===0;
+  // Child output is counted only: it may contain the random loopback authentication
+  // or startup configuration. Never upload output, environment or config here.
+  const received={code:exitCode,signal:exitSignal,closed,transportError:spawnError??resultError??(!closed?'GUARDIAN_CLEANUP_UNCONFIRMED':null),stdout:'',stderr:'',stdoutObservedBytes:stdoutBytes,stderrObservedBytes:stderrBytes,stdoutCaptureTruncated:stdoutBytes>0,stderrCaptureTruncated:stderrBytes>0};
+  persistNativeSelfTestDiagnostics(paths,{kind:'guardian',buildId,executionId:path.basename(execution),recordRoot:path.join(execution,'guardian-control'),received,report:result,okay,failures,health});
+  if(!closed)throw Error('GUARDIAN_CLEANUP_UNCONFIRMED');
+  if(!okay)throw Error('GUARDIAN_SELF_TEST_FAILED');
   const proof={status:'PASS',healthy:true,engineVersion:'1.18.17',nativeSha256:components.guardian.sha256,engineSha256:components.opencode.sha256,cleanupConfirmed:true,activeProcesses:0,testedAt:new Date().toISOString(),scope:'loopback health then stop; no model request'};
   write(path.join(runtimeRoot,'build',buildId,'guardian-self-test.json'),JSON.stringify(proof,null,2)+'\n');return proof;
 }

@@ -99,4 +99,5 @@ jobs:
             .local/ci
             .local/desktop-smoke
             .local/runtime/verification
+            .local/runtime/build/*/*-compiler.log
           if-no-files-found: ignore

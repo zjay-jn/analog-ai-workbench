@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aaw.public-source-export/v1",
   "policySha256": "deef0dfa69e58ccd0a2fb423143c671bcb0e59bdf8aa30f671a10b8e735fab3b",
-  "planSha256": "febf4614c4210b23f9f0eacfb274e2f2205e62459d79daef2b64c3c0cef7f810",
+  "planSha256": "ef807bd2c6e7ca5e7dc5342a77df4e62ce7bc86af699fd60b170cb2e14da221d",
   "files": [
     {
       "source": ".gitattributes",
@@ -12,8 +12,8 @@
     {
       "source": ".github/workflows/public-source.yml",
       "destination": ".github/workflows/public-source.yml",
-      "bytes": 4102,
-      "sha256": "48877a8a056e5d6d3b908a806b0aa7e587ade067c7cb5e27992e9ca21a2353e1"
+      "bytes": 4152,
+      "sha256": "e8fdf30ef349817e12e54a9fd800908df353fce2c2644f1424ee8737b5eee793"
     },
     {
       "source": ".gitignore",
@@ -2058,8 +2058,8 @@
     {
       "source": "package.json",
       "destination": "package.json",
-      "bytes": 3383,
-      "sha256": "b9e906a3a5b420e3c44a71e682ac95f549263921285241c4b691df8d41a86010"
+      "bytes": 3425,
+      "sha256": "73f826844864e73ffa92204f0dfa6929db4e6037c50af05802dddbeb58783a80"
     },
     {
       "source": "packages/agent-adapters/fixtures/approved-synthetic-agent-fixtures.manifest.json",
@@ -3676,6 +3676,12 @@
       "sha256": "bedb1a4286542aeeba1953ab2734fa4c9325e6777e2afeaa80ee316426ad39bb"
     },
     {
+      "source": "tests/portable-setup-diagnostics.test.mjs",
+      "destination": "tests/portable-setup-diagnostics.test.mjs",
+      "bytes": 4912,
+      "sha256": "b3f988f268c0ef3996df99dd80866da1f4271f3879b6b3c311bb86d6195585d3"
+    },
+    {
       "source": "tests/portable-setup.test.mjs",
       "destination": "tests/portable-setup.test.mjs",
       "bytes": 4529,
@@ -4440,8 +4446,8 @@
     {
       "source": "tools/portable-native-build.mjs",
       "destination": "tools/portable-native-build.mjs",
-      "bytes": 20332,
-      "sha256": "18a140cf9fc505928b348511f4a6de9201e82df54b423d45540ab66b0f6ad49a"
+      "bytes": 27289,
+      "sha256": "7d147b313e133354dadc6e3e5707291558c0f9b8f7aee455fd21435dac2dbd8d"
     },
     {
       "source": "tools/portable-runtime-lib.mjs",
