@@ -7,7 +7,7 @@ permissions:
 jobs:
   sdk:
     runs-on: windows-2022
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - name: Download and verify the official NSIS SDK
         shell: pwsh
@@ -20,4 +20,15 @@ jobs:
         with:
           name: nsis-sdk-3.13
           path: sdk/nsis-3.13.zip
+          retention-days: 1
+      - name: Download and verify the official Electron SDK
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --silent --show-error --max-time 180 --output sdk/electron-v43.4.0-win32-x64.zip 'https://github.com/electron/electron/releases/download/v43.4.0/electron-v43.4.0-win32-x64.zip'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash sdk/electron-v43.4.0-win32-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'ef0709cfa719739acce73de6f9b684304baf38c6454376638a70d34a7cecffe0') { throw 'ELECTRON_SDK_HASH_MISMATCH' }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: electron-sdk-43.4.0
+          path: sdk/electron-v43.4.0-win32-x64.zip
           retention-days: 1
