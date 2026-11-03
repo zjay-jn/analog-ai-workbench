@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import {runInNewContext} from 'node:vm';
 import {parseInstalledSmokeOptions, installedSmokeEnvironment, validateInstalledProfile, validateInstalledReady,
   validateInstalledAddon, installedFreshBootName, installedOwnershipKey, validateInstalledOwnership, installedRendererMatches,
-  installedFailureSnapshot, installedFailureDiagnostics, checkoutRoot} from '../tools/installed-desktop-smoke.mjs';
+  installedFailureSnapshot, installedFailureDiagnostics, installedRendererProbe, checkoutRoot} from '../tools/installed-desktop-smoke.mjs';
 import {assertFirstProfile} from '../tools/portable-desktop-smoke.mjs';
 
 const digest = 'a'.repeat(64), other = 'b'.repeat(64);
@@ -115,6 +116,20 @@ test('only the exact installed production renderer file can be selected as a CDP
   assert.equal(installedRendererMatches(url, renderer), true);
   for (const candidate of [url + '?debug', url + '#fragment', 'http://127.0.0.1/index.html', pathToFileURL(path.join(storage, 'index.html')).href, 'not-a-url'])
     assert.equal(installedRendererMatches(candidate, renderer), false);
+});
+
+test('the installed UI probe waits for the committed document and observes the mounted UI without returning page text', () => {
+  const url = pathToFileURL(path.join(install, 'dist/renderer/index.html')).href, marker = 'saved synthetic project';
+  const page = {location: {href: 'about:blank'}, window: {}, document: {readyState: 'loading', body: null, querySelector: () => null}};
+  const probe = () => runInNewContext(installedRendererProbe(url, marker), page);
+  assert.equal(probe(), null);
+  page.location.href = url; assert.equal(probe(), null);
+  page.document.readyState = 'interactive'; assert.equal(probe(), null);
+  page.document.body = {innerText: ''}; assert.equal(probe().textarea, false);
+  page.document.querySelector = () => ({}); page.window.workbenchModelSettings = {}; page.window.workbenchWorkspace = {};
+  page.document.body.innerText = 'private synthetic text with ' + marker;
+  assert.deepEqual({...probe()}, {textarea: true, settings: true, workspace: true, noNode: true, markerVisible: true});
+  page.location.href = 'about:blank'; assert.equal(probe(), null);
 });
 
 test('first-profile checks preserve occupied synthetic stores and refuse aliases before traversal', () => {

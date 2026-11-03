@@ -238,6 +238,15 @@ export function installedRendererMatches(value, rendererFile) {
   try {const url = new URL(value); return url.protocol === 'file:' && !url.search && !url.hash && samePath(fileURLToPath(url), rendererFile);} catch {return false;}
 }
 
+// CDP may advertise the final target URL before the renderer has parsed its document.
+export function installedRendererProbe(targetUrl, marker) {
+  return `(() => {
+    if (location.href !== ${JSON.stringify(targetUrl)} || document.readyState === 'loading' || !document.body) return null;
+    return {textarea: !!document.querySelector('textarea'), settings: !!window.workbenchModelSettings, workspace: !!window.workbenchWorkspace,
+      noNode: typeof process === 'undefined' && typeof require === 'undefined', markerVisible: document.body.innerText.includes(${JSON.stringify(marker)})};
+  })()`;
+}
+
 class CDP {
   constructor(url) {this.pending = new Map(); this.serial = 0; this.ws = new WebSocket(url);}
   async open() {
@@ -305,6 +314,7 @@ async function launch(context, current, marker, output) {
   const observe = (stream, bytes) => {
     const value = bytes.toString(), joined = tails[stream] + value;
     for (const failure of joined.match(/CLOUD_SHUTDOWN_(?:FAILED|TIMEOUT)/gu) ?? []) shutdownFailures.add(failure);
+    if (stream === 'stderr' && joined.includes('AAW_STARTUP_ERROR')) report.mainWindowStartupError = true;
     tails[stream] = joined.slice(-64);
     report[stream + 'Bytes'] = (report[stream + 'Bytes'] ?? 0) + bytes.length;
     return value;
@@ -340,15 +350,20 @@ async function launch(context, current, marker, output) {
     };
     await page.send('Fetch.enable', {patterns: [{urlPattern: '*'}]});
     report.stage = 'verify-ui'; let ui;
+    const probe = installedRendererProbe(target.url, marker);
     for (let attempt = 0; attempt < 60; attempt++) {
-      ui = await page.evaluate('({text:document.body.innerText,textarea:!!document.querySelector("textarea"),settings:!!window.workbenchModelSettings,workspace:!!window.workbenchWorkspace,noNode:typeof process==="undefined"&&typeof require==="undefined"})');
-      if (ui.textarea && ui.settings && ui.workspace) break; await sleep(100);
+      if (report.mainWindowStartupError) throw Error('PRODUCTION_MAIN_WINDOW_STARTUP_FAILED');
+      ui = await page.evaluate(probe);
+      if (ui?.textarea && ui.settings && ui.workspace && (current !== 'cold' || ui.markerVisible)) break;
+      await sleep(100);
     }
     if (!ui?.textarea || !ui.settings || !ui.workspace || !ui.noNode) throw Error('PRODUCTION_UI_NOT_READY');
     report.ui = {textarea: ui.textarea, settings: ui.settings, workspace: ui.workspace, noNode: ui.noNode};
+    report.stage = 'read-settings';
     const settings = await page.evaluate('window.workbenchModelSettings.readSettings({contractVersion:"workbench.model-settings.v1"})');
     if (!settings.ok || settings.value.storage !== 'ready' || settings.value.providers.some(provider => provider.configured)) throw Error('MODEL_SETTINGS_NOT_EMPTY');
     report.settings = {storage: settings.value.storage, providers: settings.value.providers.map(provider => ({provider: provider.provider, configured: provider.configured}))};
+    report.stage = 'read-workspace';
     const workspace = await page.evaluate('window.workbenchWorkspace.read({contractVersion:"workbench.workspace.v1"})');
     if (!workspace.ok || workspace.value.projects.length !== 1 || workspace.value.projects[0].sessionIds.length
       || (current === 'cold' ? workspace.value.projects[0].name !== marker || workspace.value.revision < 1 : workspace.value.revision !== 0)) throw Error('WORKSPACE_UNEXPECTED');
@@ -370,7 +385,7 @@ async function launch(context, current, marker, output) {
       report.stage = 'save-synthetic-project';
       const saved = await page.evaluate(`(async()=>{const r=await window.workbenchWorkspace.read({contractVersion:"workbench.workspace.v1"});if(!r.ok)return r;const state=r.value;state.projects[0].name=${JSON.stringify(marker)};return window.workbenchWorkspace.save({contractVersion:"workbench.workspace.v1",expectedRevision:state.revision,state})})()`);
       if (!saved.ok || saved.value.projects[0].name !== marker) throw Error('PROJECT_SAVE_FAILED'); report.persistedMarker = marker;
-    } else if (!ui.text.includes(marker)) throw Error('COLD_PROJECT_NOT_VISIBLE');
+    } else if (!ui.markerVisible) throw Error('COLD_PROJECT_NOT_VISIBLE');
     if (report.rendererNetworkAttempts.length || expired) throw Error('INSTALLED_SMOKE_BOUNDARY_FAILED');
     report.status = 'PASS';
   } catch (error) {report.status = 'FAIL'; report.error = String(error.message).slice(0, 400);}
@@ -383,6 +398,7 @@ async function launch(context, current, marker, output) {
     clearTimeout(timer);
     report.exitCode = code; report.normalClose = closed && code === 0 && gracefulRequested && !report.forcedStop && !expired;
     report.shutdownFailures = [...shutdownFailures];
+    if (report.mainWindowStartupError && report.status === 'PASS') {report.status = 'FAIL'; report.error = 'PRODUCTION_MAIN_WINDOW_STARTUP_FAILED';}
     if (!report.normalClose || report.shutdownFailures.length || report.rendererNetworkAttempts.length) report.status = 'FAIL';
     if (report.status === 'PASS') {
       try {
