@@ -1,0 +1,23 @@
+name: Prepare pinned installer SDK
+on:
+  push:
+    branches: [ci/windows-installer-sdk]
+permissions:
+  contents: read
+jobs:
+  sdk:
+    runs-on: windows-2022
+    timeout-minutes: 6
+    steps:
+      - name: Download and verify the official NSIS SDK
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path sdk | Out-Null
+          curl.exe --fail --location --silent --show-error --max-time 120 --output sdk/nsis-3.13.zip 'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash sdk/nsis-3.13.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8') { throw 'SDK_HASH_MISMATCH' }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nsis-sdk-3.13
+          path: sdk/nsis-3.13.zip
+          retention-days: 1
