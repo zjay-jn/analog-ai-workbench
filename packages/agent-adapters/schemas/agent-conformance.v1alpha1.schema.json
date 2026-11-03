@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.agent.conformance:v1alpha1",
+  "oneOf": [
+    { "$ref": "#/$defs/codecVector" },
+    { "$ref": "#/$defs/schemaVector" },
+    { "$ref": "#/$defs/c14nVector" },
+    { "$ref": "#/$defs/reducerVector" },
+    { "$ref": "#/$defs/ledgerRecoveryVector" },
+    { "$ref": "#/$defs/buildGateVector" },
+    { "$ref": "#/$defs/surfaceScanVector" },
+    { "$ref": "#/$defs/desktopBoundaryVector" },
+    { "$ref": "#/$defs/electronBoundaryVector" }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^N(?:0[1-9]|[12][0-9]|30)-[a-z0-9][a-z0-9._-]*$" },
+    "oracleId": { "type": "string", "pattern": "^N(?:0[1-9]|[12][0-9]|30)$" },
+    "identity": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "stage": { "enum": ["P4-A", "P4-B", "P4-C", "P4-D"] },
+    "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" } },
+    "rawInput": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["utf8Hex"], "properties": { "utf8Hex": { "type": "string", "pattern": "^(?:[0-9a-f]{2})*$" } } },
+        { "type": "object", "additionalProperties": false, "required": ["base64"], "properties": { "base64": { "type": "string", "contentEncoding": "base64" } } }
+      ]
+    },
+    "fixtureId": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$" },
+    "preState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureId", "hostSequence", "terminal", "quarantined"],
+      "properties": {
+        "fixtureId": { "$ref": "#/$defs/fixtureId" },
+        "hostSequence": { "$ref": "#/$defs/counter" },
+        "terminal": { "type": "boolean" },
+        "quarantined": { "type": "boolean" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "enum": ["advance-monotonic-clock", "commit-event", "commit-live-tail", "drain-replay-tail", "fire-cancel-timeout", "open-agent-workspace-offline", "permute-source-occurred-at", "permute-wall-clock", "reduce-recovery", "request-cancel", "replay-exact-primary-key", "replay-old-epoch-source", "replay-preterminal-exact", "replay-primary-key-conflict", "replay-secondary-key-conflict", "resolve-cross-workspace", "resolve-historical-revision", "resolve-invalid-locator-with-denied-intent", "resolve-kind-corruption", "resolve-unavailable-exact-revision", "resolve-valid-locator-with-denied-intent", "restart", "resume-old-epoch-cursor", "resume-quarantined-run", "submit-cancel-ack", "submit-exact-replay", "submit-invalid-semantic-time", "submit-late-after-cancel", "submit-late-old-transport", "submit-new-post-terminal", "submit-unnegotiated-version", "subscribe-replay", "trigger-illegal-main-pair"] },
+        "sourceSequence": { "$ref": "#/$defs/counter" },
+        "sourceEventId": { "$ref": "#/$defs/identity" },
+        "afterHostSequence": { "$ref": "#/$defs/counter" },
+        "monotonicMs": { "$ref": "#/$defs/counter" },
+        "api": { "enum": ["resolveDocument", "resolveArtifact", "resolveCitation"] },
+        "request": { "$ref": "#/$defs/json" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "action": { "const": "subscribe-replay" } }, "required": ["action"] },
+          "then": { "type": "object", "properties": { "afterHostSequence": { "$ref": "#/$defs/counter" } } },
+          "else": { "not": { "type": "object", "required": ["afterHostSequence"], "properties": { "afterHostSequence": true } } }
+        },
+        {
+          "if": { "properties": { "action": { "enum": ["commit-live-tail", "submit-cancel-ack", "submit-invalid-semantic-time", "submit-late-after-cancel"] } }, "required": ["action"] },
+          "then": { "type": "object", "required": ["sourceSequence", "sourceEventId"], "properties": { "sourceSequence": { "$ref": "#/$defs/counter" }, "sourceEventId": { "$ref": "#/$defs/identity" } } },
+          "else": { "not": { "type": "object", "required": ["sourceEventId"], "properties": { "sourceEventId": true } } }
+        },
+        {
+          "if": { "properties": { "action": { "enum": ["commit-live-tail", "submit-cancel-ack", "submit-invalid-semantic-time", "submit-late-after-cancel", "commit-event", "permute-source-occurred-at", "permute-wall-clock", "reduce-recovery", "replay-exact-primary-key", "replay-old-epoch-source", "replay-preterminal-exact", "replay-primary-key-conflict", "replay-secondary-key-conflict", "resume-old-epoch-cursor", "resume-quarantined-run", "submit-exact-replay", "submit-late-old-transport", "submit-new-post-terminal", "submit-unnegotiated-version", "trigger-illegal-main-pair"] } }, "required": ["action"] },
+          "then": { "type": "object", "required": ["sourceSequence"], "properties": { "sourceSequence": { "$ref": "#/$defs/counter" } } },
+          "else": { "not": { "type": "object", "required": ["sourceSequence"], "properties": { "sourceSequence": true } } }
+        },
+        {
+          "if": { "properties": { "action": { "enum": ["request-cancel", "advance-monotonic-clock", "fire-cancel-timeout"] } }, "required": ["action"] },
+          "then": { "type": "object", "required": ["monotonicMs"], "properties": { "monotonicMs": { "$ref": "#/$defs/counter" } } },
+          "else": { "not": { "type": "object", "required": ["monotonicMs"], "properties": { "monotonicMs": true } } }
+        },
+        {
+          "if": { "properties": { "action": { "enum": ["resolve-cross-workspace", "resolve-historical-revision", "resolve-invalid-locator-with-denied-intent", "resolve-kind-corruption", "resolve-unavailable-exact-revision", "resolve-valid-locator-with-denied-intent"] } }, "required": ["action"] },
+          "then": { "type": "object", "required": ["api", "request"], "properties": { "api": { "enum": ["resolveDocument", "resolveArtifact", "resolveCitation"] }, "request": { "$ref": "#/$defs/json" } } },
+          "else": { "allOf": [{ "not": { "type": "object", "required": ["api"], "properties": { "api": true } } }, { "not": { "type": "object", "required": ["request"], "properties": { "request": true } } }] }
+        }
+      ]
+    },
+    "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } },
+    "scanTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "target"],
+      "properties": {
+        "profile": { "enum": ["production", "development_test", "public"] },
+        "target": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$" }
+      }
+    },
+    "json": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/json" } },
+        { "type": "object", "propertyNames": { "not": { "enum": ["__proto__", "constructor", "prototype"] } }, "additionalProperties": { "$ref": "#/$defs/json" } }
+      ]
+    },
+    "schemaInput": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "value"], "properties": { "schemaTarget": { "const": "source_event" }, "value": { "$ref": "#/$defs/json" } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "value"], "properties": { "schemaTarget": { "const": "canonical_event" }, "value": { "$ref": "#/$defs/json" } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "fieldPointer", "value"], "properties": { "schemaTarget": { "const": "canonical_decimal" }, "fieldPointer": { "const": "/payload/usage/inputTokens" }, "value": { "type": "string" } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "from", "to", "expectedInvocationCount"], "properties": { "schemaTarget": { "const": "tool_transition" }, "from": { "enum": ["idle", "requested", "denied", "approved", "dispatched", "succeeded", "failed"] }, "to": { "enum": ["idle", "requested", "denied", "approved", "dispatched", "succeeded", "failed"] }, "expectedInvocationCount": { "const": 0 } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "api", "value"], "properties": { "schemaTarget": { "const": "resolve_request" }, "api": { "enum": ["resolveDocument", "resolveArtifact", "resolveCitation"] }, "value": { "$ref": "#/$defs/json" } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "value"], "properties": { "schemaTarget": { "const": "resolve_result" }, "value": { "$ref": "#/$defs/json" } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "budget", "limit", "observed", "boundary"], "properties": { "schemaTarget": { "const": "budget_contract" }, "budget": { "enum": ["raw_frame", "canonical_payload", "json_depth", "string_bytes", "run_events", "input_refs", "context_refs", "citations", "artifacts", "preview_code_points", "preview_utf8_bytes"] }, "limit": { "$ref": "#/$defs/counter" }, "observed": { "$ref": "#/$defs/counter" }, "boundary": { "enum": ["limit-1", "limit", "limit+1"] } } },
+        { "type": "object", "additionalProperties": false, "required": ["schemaTarget", "budget", "limit", "observed", "boundary", "resumability"], "properties": { "schemaTarget": { "const": "budget_contract" }, "budget": { "enum": ["queued_events", "queued_bytes"] }, "limit": { "$ref": "#/$defs/counter" }, "observed": { "$ref": "#/$defs/counter" }, "boundary": { "enum": ["limit-1", "limit", "limit+1"] }, "resumability": { "$ref": "#/$defs/budgetResumability" } } }
+      ]
+    },
+    "budgetResumability": { "type": "object", "additionalProperties": false, "required": ["currentEpoch", "cursorVerified", "resumeCapabilityNegotiated", "noPendingOrUnknownSideEffects"], "properties": { "currentEpoch": { "type": "boolean" }, "cursorVerified": { "type": "boolean" }, "resumeCapabilityNegotiated": { "type": "boolean" }, "noPendingOrUnknownSideEffects": { "type": "boolean" } } },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sideEffectCounters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolBrokerInvocationCount", "capabilityGrantCount", "productDocumentFileMutationCount", "nativeSaveHelperCallCount", "oaEdaMutationCallCount", "externalNetworkCount", "processSpawnCount", "pythonBridgeCallCount", "credentialReadCount"],
+      "properties": {
+        "toolBrokerInvocationCount": { "$ref": "#/$defs/counter" },
+        "capabilityGrantCount": { "$ref": "#/$defs/counter" },
+        "productDocumentFileMutationCount": { "$ref": "#/$defs/counter" },
+        "nativeSaveHelperCallCount": { "$ref": "#/$defs/counter" },
+        "oaEdaMutationCallCount": { "$ref": "#/$defs/counter" },
+        "externalNetworkCount": { "$ref": "#/$defs/counter" },
+        "processSpawnCount": { "$ref": "#/$defs/counter" },
+        "pythonBridgeCallCount": { "$ref": "#/$defs/counter" },
+        "credentialReadCount": { "$ref": "#/$defs/counter" }
+      }
+    },
+    "processOrRequestCounters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestCount", "successCount", "rejectedCount", "deliveryCount", "registryMutationCount", "fileReadCount"],
+      "properties": {
+        "requestCount": { "$ref": "#/$defs/counter" },
+        "successCount": { "$ref": "#/$defs/counter" },
+        "rejectedCount": { "$ref": "#/$defs/counter" },
+        "deliveryCount": { "$ref": "#/$defs/counter" },
+        "registryMutationCount": { "$ref": "#/$defs/counter" },
+        "fileReadCount": { "$ref": "#/$defs/counter" }
+      }
+    },
+    "counter": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "expectedMappingRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceEventId", "sourceSequence", "eventType", "sourcePayloadDigest", "eventId", "hostSequence"],
+      "properties": {
+        "sourceEventId": { "$ref": "#/$defs/identity" },
+        "sourceSequence": { "$ref": "#/$defs/counter" },
+        "eventType": { "enum": ["message.delta", "citation.declared", "cancel.acknowledged", "run.completed", "run.failed"] },
+        "sourcePayloadDigest": { "$ref": "#/$defs/sha256" },
+        "eventId": { "$ref": "#/$defs/identity" },
+        "hostSequence": { "$ref": "#/$defs/counter" }
+      }
+    },
+    "expectedCommitRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostRunId", "eventId", "hostSequence", "resumeEpoch"],
+      "properties": {
+        "hostRunId": { "$ref": "#/$defs/identity" },
+        "eventId": { "$ref": "#/$defs/identity" },
+        "hostSequence": { "$ref": "#/$defs/counter" },
+        "resumeEpoch": { "$ref": "#/$defs/counter" }
+      }
+    },
+    "stateExpected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "retryability", "recoveryAction", "warningCodes", "canonicalEvents", "mappingDelta", "ledgerDelta", "reducerDelta", "ackDelta", "quarantineState", "rendererEmissions", "sideEffectCounters"],
+      "properties": {
+        "decision": { "enum": ["accept", "reject", "pass", "truncate", "block", "isolate"] },
+        "errorCode": { "enum": ["INVALID_REQUEST", "PROTOCOL_MISMATCH", "CAPABILITY_DENIED", "NOT_CONFIGURED", "ADAPTER_UNAVAILABLE", "UPSTREAM_TIMEOUT", "RATE_LIMITED", "STREAM_INTERRUPTED", "EVENT_GAP", "MALFORMED_EVENT", "CANCELLATION_TIMEOUT", "TOOL_DENIED", "TOOL_FAILED", "RECOVERY_UNSUPPORTED", "REVISION_UNAVAILABLE", "INTERNAL"] },
+        "retryability": { "enum": ["never", "safe_resume", "safe_same_request"] },
+        "recoveryAction": { "enum": ["none", "reconfigure", "start_new_run", "resume_from_cursor", "retry_same_request"] },
+        "warningCodes": { "type": "array", "uniqueItems": true, "items": { "const": "SOURCE_TIME_INVALID" } },
+        "canonicalBytesSha256": { "$ref": "#/$defs/sha256" },
+        "freshness": { "enum": ["current", "historical"] },
+        "canonicalEvents": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "hostRunId", "eventId", "hostSequence", "acceptedAt", "canonicalPayloadDigest", "canonicalUtf8Hex"],
+                "properties": {
+                  "type": { "enum": ["run.accepted", "message.delta", "citation.declared", "run.completed", "run.failed", "run.cancelled"] },
+                  "hostRunId": { "$ref": "#/$defs/fixtureId" },
+                  "eventId": { "$ref": "#/$defs/fixtureId" },
+                  "hostSequence": { "$ref": "#/$defs/counter" },
+                  "acceptedAt": { "type": "string", "pattern": "^(?!0000)(?:(?:(?:[0-9]{2}(?:0[48]|[2468][048]|[13579][26])|(?:[02468][048]|[13579][26])00)-02-29)|(?:[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|02-(?:0[1-9]|1[0-9]|2[0-8]))))T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?Z$" },
+                  "canonicalPayloadDigest": { "$ref": "#/$defs/sha256" },
+                  "canonicalUtf8Hex": { "type": "string", "pattern": "^(?:[0-9a-f]{2})+$" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["canonicalUtf8Hex"],
+                "properties": { "canonicalUtf8Hex": { "type": "string", "pattern": "^(?:[0-9a-f]{2})+$" } }
+              }
+            ]
+          }
+        },
+        "mappingDelta": { "$ref": "#/$defs/counter" },
+        "ledgerDelta": { "$ref": "#/$defs/counter" },
+        "reducerDelta": { "$ref": "#/$defs/counter" },
+        "ackDelta": { "$ref": "#/$defs/counter" },
+        "cancelDispatchDelta": { "$ref": "#/$defs/counter" },
+        "postCancelCommandId": { "$ref": "#/$defs/fixtureId" },
+        "postCancelDeadlineMonotonicMs": { "$ref": "#/$defs/counter" },
+        "postCancelDispatchState": { "enum": ["pending", "dispatched"] },
+        "checkpointDelta": { "$ref": "#/$defs/counter" },
+        "ackPersistDelta": { "$ref": "#/$defs/counter" },
+        "mappingRows": { "type": "array", "items": { "$ref": "#/$defs/expectedMappingRow" } },
+        "checkpointRows": { "type": "array", "items": { "$ref": "#/$defs/expectedCommitRow" } },
+        "ackRows": { "type": "array", "items": { "$ref": "#/$defs/expectedCommitRow" } },
+        "deliveryHostSequences": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/counter" } },
+        "subscriptionDisposition": { "enum": ["wait", "end", "reject", "closed"] },
+        "postRunLifecycle": { "enum": ["running", "cancelling", "terminal", "quarantined"] },
+        "quarantineState": { "enum": ["unchanged", "active", "cleared"] },
+        "rendererEmissions": { "$ref": "#/$defs/counter" },
+        "sideEffectCounters": { "$ref": "#/$defs/sideEffectCounters" },
+        "processOrRequestCounters": { "$ref": "#/$defs/processOrRequestCounters" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "decision": { "enum": ["reject", "block", "isolate"] } }, "required": ["decision"] },
+          "then": { "type": "object", "required": ["errorCode"], "properties": { "errorCode": true } }
+        },
+        {
+          "if": { "type": "object", "properties": { "decision": { "enum": ["accept", "pass", "truncate"] } }, "required": ["decision"] },
+          "then": { "type": "object", "properties": { "errorCode": true }, "not": { "type": "object", "required": ["errorCode"], "properties": { "errorCode": true } } }
+        },
+        {
+          "if": { "type": "object", "properties": { "retryability": { "const": "never" } }, "required": ["retryability"] },
+          "then": { "type": "object", "properties": { "recoveryAction": { "enum": ["none", "reconfigure", "start_new_run"] } } }
+        },
+        {
+          "if": { "type": "object", "properties": { "retryability": { "const": "safe_resume" } }, "required": ["retryability"] },
+          "then": { "type": "object", "properties": { "recoveryAction": { "const": "resume_from_cursor" } } }
+        },
+        {
+          "if": { "type": "object", "properties": { "retryability": { "const": "safe_same_request" } }, "required": ["retryability"] },
+          "then": { "type": "object", "properties": { "recoveryAction": { "const": "retry_same_request" } } }
+        }
+      ]
+    },
+    "actionExpectedClosure": {
+      "type": "object",
+      "allOf": [
+        {
+          "if": { "type": "object", "required": ["steps"], "properties": { "steps": { "type": "array", "contains": { "type": "object", "required": ["action"], "properties": { "action": { "enum": ["subscribe-replay", "commit-live-tail", "drain-replay-tail"] } } } } } },
+          "then": { "type": "object", "properties": { "expected": { "type": "object", "required": ["deliveryHostSequences", "subscriptionDisposition"], "properties": { "deliveryHostSequences": true, "subscriptionDisposition": true } } } },
+          "else": { "type": "object", "properties": { "expected": { "type": "object", "allOf": [{ "not": { "type": "object", "required": ["deliveryHostSequences"], "properties": { "deliveryHostSequences": true } } }, { "not": { "type": "object", "required": ["subscriptionDisposition"], "properties": { "subscriptionDisposition": true } } }] } } }
+        },
+        {
+          "if": { "type": "object", "required": ["steps"], "properties": { "steps": { "type": "array", "contains": { "type": "object", "required": ["action"], "properties": { "action": { "enum": ["request-cancel", "advance-monotonic-clock", "fire-cancel-timeout", "submit-cancel-ack", "submit-late-after-cancel"] } } } } } },
+          "then": { "type": "object", "properties": { "expected": { "type": "object", "required": ["cancelDispatchDelta", "postRunLifecycle"], "properties": { "cancelDispatchDelta": true, "postRunLifecycle": true } } } },
+          "else": { "type": "object", "properties": { "expected": { "type": "object", "allOf": [{ "not": { "type": "object", "required": ["cancelDispatchDelta"], "properties": { "cancelDispatchDelta": true } } }, { "not": { "type": "object", "required": ["postRunLifecycle"], "properties": { "postRunLifecycle": true } } }] } } }
+        },
+        {
+          "if": { "type": "object", "required": ["steps", "expected"], "properties": { "steps": { "type": "array", "contains": { "type": "object", "required": ["action"], "properties": { "action": { "const": "request-cancel" } } } }, "expected": { "type": "object", "required": ["cancelDispatchDelta"], "properties": { "cancelDispatchDelta": { "type": "integer", "minimum": 1 } } } } },
+          "then": { "type": "object", "properties": { "expected": { "type": "object", "required": ["postCancelCommandId", "postCancelDeadlineMonotonicMs", "postCancelDispatchState"], "properties": { "postCancelCommandId": true, "postCancelDeadlineMonotonicMs": true, "postCancelDispatchState": true } } } },
+          "else": { "type": "object", "properties": { "expected": { "type": "object", "allOf": [{ "not": { "type": "object", "required": ["postCancelCommandId"], "properties": { "postCancelCommandId": true } } }, { "not": { "type": "object", "required": ["postCancelDeadlineMonotonicMs"], "properties": { "postCancelDeadlineMonotonicMs": true } } }, { "not": { "type": "object", "required": ["postCancelDispatchState"], "properties": { "postCancelDispatchState": true } } }] } } }
+        },
+        {
+          "if": { "type": "object", "anyOf": [{ "type": "object", "required": ["harness"], "properties": { "harness": { "const": "ledger_recovery" } } }, { "type": "object", "required": ["steps"], "properties": { "steps": { "type": "array", "contains": { "type": "object", "required": ["action"], "properties": { "action": { "enum": ["commit-live-tail", "submit-cancel-ack"] } } } } } }] },
+          "then": { "type": "object", "properties": { "expected": { "type": "object", "required": ["checkpointDelta", "ackPersistDelta", "checkpointRows", "ackRows"], "properties": { "checkpointDelta": true, "ackPersistDelta": true, "checkpointRows": true, "ackRows": true }, "allOf": [{ "if": { "type": "object", "required": ["checkpointDelta"], "properties": { "checkpointDelta": { "const": 0 } } }, "then": { "type": "object", "properties": { "checkpointRows": { "type": "array", "maxItems": 0 } } }, "else": { "type": "object", "properties": { "checkpointRows": { "type": "array", "minItems": 1 } } } }, { "if": { "type": "object", "required": ["ackPersistDelta"], "properties": { "ackPersistDelta": { "const": 0 } } }, "then": { "type": "object", "properties": { "ackRows": { "type": "array", "maxItems": 0 } } }, "else": { "type": "object", "properties": { "ackRows": { "type": "array", "minItems": 1 } } } }] } } },
+          "else": { "type": "object", "properties": { "expected": { "type": "object", "allOf": [{ "not": { "type": "object", "required": ["checkpointDelta"], "properties": { "checkpointDelta": true } } }, { "not": { "type": "object", "required": ["ackPersistDelta"], "properties": { "ackPersistDelta": true } } }, { "not": { "type": "object", "required": ["checkpointRows"], "properties": { "checkpointRows": true } } }, { "not": { "type": "object", "required": ["ackRows"], "properties": { "ackRows": true } } }] } } }
+        },
+        {
+          "if": { "type": "object", "required": ["steps"], "properties": { "steps": { "type": "array", "contains": { "type": "object", "required": ["action"], "properties": { "action": { "enum": ["commit-live-tail", "submit-cancel-ack"] } } } } } },
+          "then": { "type": "object", "properties": { "expected": { "type": "object", "properties": { "mappingRows": true }, "allOf": [{ "if": { "type": "object", "required": ["mappingDelta"], "properties": { "mappingDelta": { "type": "integer", "minimum": 1 } } }, "then": { "type": "object", "required": ["mappingRows"], "properties": { "mappingRows": true } } }] } } },
+          "else": { "type": "object", "properties": { "expected": { "type": "object", "not": { "type": "object", "required": ["mappingRows"], "properties": { "mappingRows": true } } } } }
+        }
+      ]
+    },
+    "staticExpected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "sideEffectCounters", "processOrRequestCounters"],
+      "properties": {
+        "decision": { "enum": ["pass", "block"] },
+        "sideEffectCounters": { "$ref": "#/$defs/sideEffectCounters" },
+        "processOrRequestCounters": { "$ref": "#/$defs/processOrRequestCounters" }
+      }
+    },
+    "header": {
+      "type": "object",
+      "required": ["id", "oracleId", "contractVersion", "harness", "requiredStage", "negotiatedCapabilities", "expected"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "oracleId": { "$ref": "#/$defs/oracleId" },
+        "contractVersion": { "const": "aaw.agent.conformance/v1alpha1" },
+        "harness": { "enum": ["codec", "schema", "c14n", "reducer", "ledger_recovery", "build_gate", "surface_scan", "desktop_boundary", "electron_boundary"] },
+        "requiredStage": { "$ref": "#/$defs/stage" },
+        "negotiatedCapabilities": { "$ref": "#/$defs/capabilities" },
+        "expected": true
+      }
+    },
+    "codecVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["rawInput"], "properties": { "harness": { "const": "codec" }, "requiredStage": { "const": "P4-A" }, "rawInput": { "$ref": "#/$defs/rawInput" }, "expected": { "$ref": "#/$defs/stateExpected" } } }] },
+    "schemaVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["jsonInput"], "properties": { "harness": { "const": "schema" }, "requiredStage": { "const": "P4-A" }, "jsonInput": { "$ref": "#/$defs/schemaInput" }, "expected": { "$ref": "#/$defs/stateExpected" } } }] },
+    "c14nVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "oneOf": [{ "type": "object", "required": ["rawInput"], "properties": { "rawInput": true }, "not": { "type": "object", "required": ["jsonInput"], "properties": { "jsonInput": true } } }, { "type": "object", "required": ["jsonInput"], "properties": { "jsonInput": true }, "not": { "type": "object", "required": ["rawInput"], "properties": { "rawInput": true } } }], "properties": { "harness": { "const": "c14n" }, "requiredStage": { "const": "P4-A" }, "rawInput": { "$ref": "#/$defs/rawInput" }, "jsonInput": { "$ref": "#/$defs/json" }, "expected": { "allOf": [{ "$ref": "#/$defs/stateExpected" }, { "if": { "type": "object", "properties": { "decision": { "const": "accept" } }, "required": ["decision"] }, "then": { "type": "object", "required": ["canonicalBytesSha256"], "properties": { "canonicalBytesSha256": true } } }] } } }] },
+    "reducerVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["preState", "steps"], "properties": { "harness": { "const": "reducer" }, "requiredStage": { "const": "P4-B" }, "preState": { "$ref": "#/$defs/preState" }, "steps": { "$ref": "#/$defs/steps" }, "expected": { "$ref": "#/$defs/stateExpected" } } }, { "$ref": "#/$defs/actionExpectedClosure" }] },
+    "ledgerRecoveryVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["preState", "steps", "faultPoint"], "properties": { "harness": { "const": "ledger_recovery" }, "requiredStage": { "const": "P4-B" }, "preState": { "$ref": "#/$defs/preState" }, "steps": { "$ref": "#/$defs/steps" }, "faultPoint": { "enum": ["before-commit", "after-commit-before-ack"] }, "expected": { "$ref": "#/$defs/stateExpected" } } }, { "$ref": "#/$defs/actionExpectedClosure" }] },
+    "buildGateVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["scanTarget"], "properties": { "harness": { "const": "build_gate" }, "requiredStage": { "enum": ["P4-A", "P4-C"] }, "scanTarget": { "$ref": "#/$defs/scanTarget" }, "expected": { "$ref": "#/$defs/staticExpected" } } }] },
+    "surfaceScanVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["scanTarget"], "properties": { "harness": { "const": "surface_scan" }, "requiredStage": { "enum": ["P4-A", "P4-C"] }, "scanTarget": { "$ref": "#/$defs/scanTarget" }, "expected": { "$ref": "#/$defs/staticExpected" } } }] },
+    "desktopBoundaryVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["preState", "steps"], "properties": { "harness": { "const": "desktop_boundary" }, "requiredStage": { "const": "P4-C" }, "preState": { "$ref": "#/$defs/preState" }, "steps": { "$ref": "#/$defs/steps" }, "expected": { "$ref": "#/$defs/stateExpected" } } }] },
+    "electronBoundaryVector": { "type": "object", "unevaluatedProperties": false, "allOf": [{ "$ref": "#/$defs/header" }, { "type": "object", "required": ["preState", "steps"], "properties": { "harness": { "const": "electron_boundary" }, "requiredStage": { "const": "P4-D" }, "preState": { "$ref": "#/$defs/preState" }, "steps": { "$ref": "#/$defs/steps" }, "expected": { "$ref": "#/$defs/stateExpected" } } }] }
+  }
+}

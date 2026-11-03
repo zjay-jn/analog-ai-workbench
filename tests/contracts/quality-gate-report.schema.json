@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.quality-gate-report/v1alpha1",
+  "title": "Analog AI Workbench quality gate report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "gateId",
+    "phase",
+    "status",
+    "source",
+    "environment",
+    "startedAt",
+    "endedAt",
+    "commands",
+    "tests",
+    "artifacts",
+    "knownIssues",
+    "waivers"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "aaw.quality-gate-report/v1alpha1"
+    },
+    "gateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "phase": {
+      "enum": ["phase0", "phase1", "phase2", "phase3", "phase4", "phase5"]
+    },
+    "status": {
+      "enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baselineManifestSha256",
+        "changedFilesManifestSha256",
+        "reversePatchSha256"
+      ],
+      "properties": {
+        "gitRevision": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 64
+        },
+        "baselineManifestSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "changedFilesManifestSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reversePatchSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "architecture", "node", "npm", "electron"],
+      "properties": {
+        "platform": {
+          "const": "win32"
+        },
+        "architecture": {
+          "enum": ["x64", "arm64"]
+        },
+        "node": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "npm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "electron": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "packageLockSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sbomSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "exitCode"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "exitCode": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "failed"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["relativePath", "sha256"],
+        "properties": {
+          "relativePath": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 260,
+            "not": {
+              "pattern": "^(?:[A-Za-z]:|[/\\\\])"
+            }
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "knownIssues": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "waivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "reason", "expiresAt"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "qa": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "product": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

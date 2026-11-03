@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.circuit-ir.reviewed/v1alpha1",
+  "$comment": "aaw.pipeline-precondition/v1: strict raw decoding rejects lexical negative zero and enforces UTF-8 byte budgets before schema validation; JSON Schema numeric equality cannot distinguish parsed -0 from 0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "canonicalizationVersion", "coordinateUnit", "bounds", "rootDefinitionId", "definitions"],
+  "properties": {
+    "schemaVersion": { "const": "aaw.circuit-ir.reviewed/v1alpha1" },
+    "canonicalizationVersion": { "const": "aaw-json-c14n/v1" },
+    "coordinateUnit": { "$ref": "#/$defs/boundedString" },
+    "bounds": { "$ref": "#/$defs/bounds" },
+    "rootDefinitionId": { "$ref": "#/$defs/boundedString" },
+    "definitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/definition" }
+    }
+  },
+  "$defs": {
+    "boundedString": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "$comment": "maxLength is a code-point structural ceiling; main semantic validation independently enforces maxUtf8Bytes=4096." },
+    "labelString": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "$comment": "Labels are bounded Unicode plain text with no execution semantics. maxLength=512 is a code-point limit; main also enforces maxUtf8Bytes=4096. Closed parent schemas reject raw HTML/SVG/XML/CSS/URI/command/extension carrier fields without rejecting markup-like label text." },
+    "coordinate": { "type": "number", "minimum": -1000000000, "maximum": 1000000000, "$comment": "Input is reachable only after strict raw decoding rejects every JSON number token that parses to negative zero, including -0, -0.0, and exponent forms." },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minX", "minY", "maxX", "maxY"],
+      "properties": {
+        "minX": { "$ref": "#/$defs/coordinate" },
+        "minY": { "$ref": "#/$defs/coordinate" },
+        "maxX": { "$ref": "#/$defs/coordinate" },
+        "maxY": { "$ref": "#/$defs/coordinate" }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": { "x": { "$ref": "#/$defs/coordinate" }, "y": { "$ref": "#/$defs/coordinate" } }
+    },
+    "terminalMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminalId", "parentNetId", "childPortId", "childNetId"],
+      "properties": {
+        "terminalId": { "$ref": "#/$defs/boundedString" },
+        "parentNetId": { "$ref": "#/$defs/boundedString" },
+        "childPortId": { "$ref": "#/$defs/boundedString" },
+        "childNetId": { "$ref": "#/$defs/boundedString" }
+      }
+    },
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instanceId"],
+      "properties": {
+        "instanceId": { "$ref": "#/$defs/boundedString" },
+        "childDefinitionId": { "$ref": "#/$defs/boundedString" },
+        "blackbox": { "type": "boolean" },
+        "bounds": { "$ref": "#/$defs/bounds" },
+        "terminalMappings": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/terminalMapping" }, "$comment": "Main semantic validation enforces a complete one-to-one mapping between every non-blackbox parent pin terminal and every child port." }
+      },
+      "oneOf": [
+        {
+          "required": ["childDefinitionId"],
+          "properties": {
+            "childDefinitionId": { "$ref": "#/$defs/boundedString" },
+            "blackbox": { "const": false }
+          }
+        },
+        {
+          "required": ["blackbox"],
+          "properties": {
+            "blackbox": { "const": true },
+            "childDefinitionId": false,
+            "terminalMappings": { "type": "array", "maxItems": 0 }
+          }
+        }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portId"],
+      "properties": {
+        "portId": { "$ref": "#/$defs/boundedString" },
+        "netId": { "$ref": "#/$defs/boundedString" },
+        "x": { "$ref": "#/$defs/coordinate" },
+        "y": { "$ref": "#/$defs/coordinate" }
+      },
+      "dependentRequired": { "x": ["y"], "y": ["x"] }
+    },
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pinId", "instanceId", "terminalId", "netId"],
+      "properties": {
+        "pinId": { "$ref": "#/$defs/boundedString" },
+        "instanceId": { "$ref": "#/$defs/boundedString" },
+        "terminalId": { "$ref": "#/$defs/boundedString" },
+        "netId": { "$ref": "#/$defs/boundedString" },
+        "x": { "$ref": "#/$defs/coordinate" },
+        "y": { "$ref": "#/$defs/coordinate" }
+      },
+      "dependentRequired": { "x": ["y"], "y": ["x"] }
+    },
+    "net": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["netId", "memberElementIds"],
+      "properties": {
+        "netId": { "$ref": "#/$defs/boundedString" },
+        "memberElementIds": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/boundedString" } }
+      }
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wireId", "netId"],
+      "properties": {
+        "wireId": { "$ref": "#/$defs/boundedString" },
+        "netId": { "$ref": "#/$defs/boundedString" },
+        "points": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/point" } }
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["labelId", "text"],
+      "properties": {
+        "labelId": { "$ref": "#/$defs/boundedString" },
+        "text": { "$ref": "#/$defs/labelString" },
+        "x": { "$ref": "#/$defs/coordinate" },
+        "y": { "$ref": "#/$defs/coordinate" },
+        "targetElementId": { "$ref": "#/$defs/boundedString" }
+      },
+      "dependentRequired": { "x": ["y"], "y": ["x"] }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definitionId", "bounds", "instances", "ports", "nets", "wires", "labels", "renderOrder"],
+      "properties": {
+        "definitionId": { "$ref": "#/$defs/boundedString" },
+        "bounds": { "$ref": "#/$defs/bounds" },
+        "instances": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/instance" } },
+        "ports": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/port" } },
+        "pins": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/pin" } },
+        "nets": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/net" } },
+        "wires": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/wire" } },
+        "labels": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/label" } },
+        "renderOrder": { "type": "array", "maxItems": 50000, "items": { "$ref": "#/$defs/boundedString" } }
+      }
+    }
+  }
+}

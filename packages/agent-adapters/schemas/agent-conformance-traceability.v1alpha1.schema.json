@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.agent.conformance.traceability:v1alpha1",
+  "$comment": "Runtime validation additionally proves id-to-oracle prefix ownership, unique vector/state ids, complete N01-N30 coverage, all state references resolve, preState matches the seed, and an electron-boundary vector is frozen.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "stateFixtures", "vectors"],
+  "properties": {
+    "contractVersion": { "const": "aaw.agent.conformance/v1alpha1" },
+    "stateFixtures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/stateFixture" }
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 30,
+      "uniqueItems": true,
+      "items": { "$ref": "aaw.agent.conformance:v1alpha1" }
+    }
+  },
+  "$defs": {
+    "identity": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "counter": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapterInstanceId", "resumeEpoch", "sourceRunId", "sourceSchemaVersion", "sourceCanonicalizationVersion", "callerScope"],
+      "properties": {
+        "adapterInstanceId": { "$ref": "#/$defs/identity" },
+        "resumeEpoch": { "$ref": "#/$defs/counter" },
+        "sourceRunId": { "$ref": "#/$defs/identity" },
+        "sourceSchemaVersion": { "const": "aaw.agent.source-event/v1alpha1" },
+        "sourceCanonicalizationVersion": { "const": "aaw-json-c14n/v1" },
+        "callerScope": { "enum": ["authorized", "unauthorized"] },
+        "documentId": { "$ref": "#/$defs/identity" },
+        "documentRevisionId": { "$ref": "#/$defs/identity" },
+        "documentKind": { "enum": ["text", "schematic_reviewed"] },
+        "artifactId": { "$ref": "#/$defs/identity" },
+        "artifactRevisionId": { "$ref": "#/$defs/identity" },
+        "artifactKind": { "enum": ["circuit_ir_reviewed", "generic"] },
+        "revisionAvailable": { "type": "boolean" },
+        "revisionFreshness": { "enum": ["current", "historical"] },
+        "sourceLocatorValid": { "type": "boolean" },
+        "intentAuthorized": { "type": "boolean" },
+        "resolutionAvailable": { "type": "boolean" }
+      },
+      "dependentRequired": {
+        "documentId": ["documentRevisionId", "documentKind"],
+        "documentRevisionId": ["documentId", "documentKind"],
+        "documentKind": ["documentId", "documentRevisionId"],
+        "artifactId": ["artifactRevisionId", "artifactKind"],
+        "artifactRevisionId": ["artifactId", "artifactKind"],
+        "artifactKind": ["artifactId", "artifactRevisionId"]
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostRunId", "hostSequence", "terminal", "quarantined", "cursorVerified", "resumeCapability", "sideEffectState", "ledgerIntegrity"],
+      "properties": {
+        "hostRunId": { "$ref": "#/$defs/identity" },
+        "hostSequence": { "$ref": "#/$defs/counter" },
+        "terminal": { "type": "boolean" },
+        "quarantined": { "type": "boolean" },
+        "cursorVerified": { "type": "boolean" },
+        "resumeCapability": { "type": "boolean" },
+        "sideEffectState": { "enum": ["none", "known_complete", "unknown"] },
+        "ledgerIntegrity": { "enum": ["valid", "corrupt"] },
+        "committedHead": { "$ref": "#/$defs/counter" },
+        "retentionFloor": { "$ref": "#/$defs/counter" },
+        "snapshotHead": { "$ref": "#/$defs/counter" },
+        "tailRegisteredAfter": { "$ref": "#/$defs/counter" },
+        "lifecycle": { "enum": ["running", "cancelling", "terminal", "quarantined"] },
+        "cancelCommandId": { "$ref": "#/$defs/identity" },
+        "cancelDeadlineMonotonicMs": { "$ref": "#/$defs/counter" },
+        "cancelDispatchState": { "enum": ["none", "pending", "dispatched"] }
+      },
+      "oneOf": [
+        {
+          "not": { "required": ["lifecycle"], "properties": { "lifecycle": true } },
+          "allOf": [
+            { "not": { "required": ["cancelCommandId"], "properties": { "cancelCommandId": true } } },
+            { "not": { "required": ["cancelDeadlineMonotonicMs"], "properties": { "cancelDeadlineMonotonicMs": true } } },
+            { "not": { "required": ["cancelDispatchState"], "properties": { "cancelDispatchState": true } } }
+          ]
+        },
+        {
+          "required": ["lifecycle"],
+          "properties": { "lifecycle": { "enum": ["running", "terminal", "quarantined"] }, "cancelDispatchState": { "const": "none" } },
+          "allOf": [
+            { "not": { "required": ["cancelCommandId"], "properties": { "cancelCommandId": true } } },
+            { "not": { "required": ["cancelDeadlineMonotonicMs"], "properties": { "cancelDeadlineMonotonicMs": true } } }
+          ]
+        },
+        {
+          "required": ["lifecycle", "cancelCommandId", "cancelDeadlineMonotonicMs", "cancelDispatchState"],
+          "properties": { "lifecycle": { "const": "cancelling" }, "cancelCommandId": { "$ref": "#/$defs/identity" }, "cancelDeadlineMonotonicMs": { "$ref": "#/$defs/counter" }, "cancelDispatchState": { "enum": ["pending", "dispatched"] } }
+        }
+      ]
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceEventId", "sourceSequence", "eventType", "sourcePayloadDigest", "eventId", "hostSequence"],
+      "properties": {
+        "sourceEventId": { "$ref": "#/$defs/identity" },
+        "sourceSequence": { "$ref": "#/$defs/counter" },
+        "eventType": { "enum": ["message.delta", "citation.declared", "cancel.acknowledged", "run.completed", "run.failed"] },
+        "sourcePayloadDigest": { "$ref": "#/$defs/sha256" },
+        "eventId": { "$ref": "#/$defs/identity" },
+        "hostSequence": { "$ref": "#/$defs/counter" }
+      }
+    },
+    "ledgerRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostRunId", "eventId", "hostSequence", "acceptedAt", "type", "canonicalPayloadDigest", "canonicalUtf8Hex"],
+      "properties": {
+        "hostRunId": { "$ref": "#/$defs/identity" },
+        "eventId": { "$ref": "#/$defs/identity" },
+        "hostSequence": { "$ref": "#/$defs/counter" },
+        "acceptedAt": { "type": "string", "pattern": "^(?!0000)(?:(?:(?:[0-9]{2}(?:0[48]|[2468][048]|[13579][26])|(?:[02468][048]|[13579][26])00)-02-29)|(?:[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|02-(?:0[1-9]|1[0-9]|2[0-8]))))T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?Z$" },
+        "type": { "enum": ["run.accepted", "message.delta", "citation.declared", "run.completed", "run.failed", "run.cancelled"] },
+        "canonicalPayloadDigest": { "$ref": "#/$defs/sha256" },
+        "canonicalUtf8Hex": { "type": "string", "pattern": "^(?:[0-9a-f]{2})+$" }
+      }
+    },
+    "commitRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostRunId", "eventId", "hostSequence", "resumeEpoch"],
+      "properties": {
+        "hostRunId": { "$ref": "#/$defs/identity" },
+        "eventId": { "$ref": "#/$defs/identity" },
+        "hostSequence": { "$ref": "#/$defs/counter" },
+        "resumeEpoch": { "$ref": "#/$defs/counter" }
+      }
+    },
+    "stateFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureId", "binding", "run", "mappings", "ledger"],
+      "properties": {
+        "fixtureId": { "$ref": "#/$defs/identity" },
+        "binding": { "$ref": "#/$defs/binding" },
+        "run": { "$ref": "#/$defs/run" },
+        "mappings": { "type": "array", "items": { "$ref": "#/$defs/mapping" } },
+        "ledger": { "type": "array", "items": { "$ref": "#/$defs/ledgerRow" } },
+        "checkpoints": { "type": "array", "items": { "$ref": "#/$defs/commitRow" } },
+        "acks": { "type": "array", "items": { "$ref": "#/$defs/commitRow" } }
+      },
+      "if": {
+        "type": "object",
+        "required": ["run"],
+        "properties": {
+          "run": {
+            "type": "object",
+            "required": ["ledgerIntegrity"],
+            "properties": { "ledgerIntegrity": { "const": "corrupt" } }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["fixtureId"],
+        "properties": {
+          "fixtureId": {
+            "enum": [
+              "synthetic-corrupt-mapping-only",
+              "synthetic-corrupt-event-only",
+              "synthetic-corrupt-checkpoint-only",
+              "synthetic-corrupt-ack-before-commit",
+              "synthetic-corrupt-ledger"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

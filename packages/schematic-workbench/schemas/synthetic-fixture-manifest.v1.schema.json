@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.synthetic-fixture-manifest/v1alpha1",
+  "$comment": "aaw.pipeline-precondition/v1: strict raw decoding rejects lexical negative zero and enforces UTF-8 byte budgets before schema and manifest semantic validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "canonicalizationVersion", "manifestId", "issuerId", "receiptClass", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "aaw.synthetic-fixture-manifest/v1alpha1" },
+    "canonicalizationVersion": { "const": "aaw-json-c14n/v1" },
+    "manifestId": { "const": "aaw.synthetic.reviewed-fixtures/v1" },
+    "issuerId": { "const": "aaw.main.fixture-registry/v1" },
+    "receiptClass": { "const": "synthetic_fixture_admission" },
+    "entries": { "type": "array", "minItems": 8, "maxItems": 8, "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "boundedString": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "$comment": "maxLength is a code-point structural ceiling; main manifest semantic validation independently enforces maxUtf8Bytes=4096." },
+    "identityComponent": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$", "$comment": "The canonical identity alphabet is ASCII, so code-point length and UTF-8 byte length are exactly equal." },
+    "documentRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["documentId", "revisionId", "documentKind"],
+      "properties": { "documentId": { "$ref": "#/$defs/identityComponent" }, "revisionId": { "$ref": "#/$defs/identityComponent" }, "documentKind": { "const": "schematic_reviewed" } }
+    },
+    "artifactRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["artifactId", "revisionId", "artifactKind"],
+      "properties": { "artifactId": { "$ref": "#/$defs/identityComponent" }, "revisionId": { "$ref": "#/$defs/identityComponent" }, "artifactKind": { "const": "circuit_ir_reviewed" } }
+    },
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["definitions", "entities", "nets", "references"],
+      "properties": {
+        "definitions": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "entities": { "type": "integer", "minimum": 0, "maximum": 50000 },
+        "nets": { "type": "integer", "minimum": 0, "maximum": 50000 },
+        "references": { "type": "integer", "minimum": 0, "maximum": 100000 }
+      }
+    },
+    "limitOracle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "declaredBoundary"],
+      "properties": {
+        "mode": { "enum": ["inline-small", "generated-boundary"] },
+        "declaredBoundary": { "$ref": "#/$defs/boundedString" }
+      }
+    },
+    "entry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fixtureId", "relativePath", "byteLength", "rawSha256", "payloadDigest", "documentRef", "artifactRef", "receiptId", "schemaVersion", "canonicalizationVersion", "provenance", "license", "issuerId", "counts", "limitOracle", "expectedSemanticOracleIds", "forbiddenRealDataAttestation", "ownerApprovals"],
+      "properties": {
+        "fixtureId": { "$ref": "#/$defs/boundedString" },
+        "relativePath": { "type": "string", "pattern": "^packages/schematic-workbench/fixtures/[a-z0-9-]+\\.json$", "maxLength": 256 },
+        "byteLength": { "type": "integer", "minimum": 1, "maximum": 8388608 },
+        "rawSha256": { "$ref": "#/$defs/digest" },
+        "payloadDigest": { "$ref": "#/$defs/digest" },
+        "documentRef": { "$ref": "#/$defs/documentRef" },
+        "artifactRef": { "$ref": "#/$defs/artifactRef" },
+        "receiptId": { "$ref": "#/$defs/boundedString" },
+        "schemaVersion": { "const": "aaw.circuit-ir.reviewed/v1alpha1" },
+        "canonicalizationVersion": { "const": "aaw-json-c14n/v1" },
+        "provenance": { "const": "hand-authored-synthetic" },
+        "license": { "const": "CC0-1.0" },
+        "issuerId": { "const": "aaw.main.fixture-registry/v1" },
+        "counts": { "$ref": "#/$defs/counts" },
+        "limitOracle": { "$ref": "#/$defs/limitOracle" },
+        "expectedSemanticOracleIds": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/boundedString" } },
+        "forbiddenRealDataAttestation": { "const": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data" },
+        "ownerApprovals": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/boundedString" } }
+      }
+    }
+  }
+}

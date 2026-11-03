@@ -1,0 +1,60 @@
+{
+  "name": "analog-ai-workbench",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Windows-first desktop workbench for analog IC engineering.",
+  "license": "MIT",
+  "main": "dist/main/main/index.js",
+  "engines": {
+    "node": "24.20.0",
+    "npm": "11.19.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "scripts": {
+    "release:plan": "node tools/public-release/index.mjs plan",
+    "release:audit": "node tools/public-release/index.mjs audit",
+    "test:release": "node --test tests/public-release.test.mjs",
+    "test:public": "node tools/public-core-tests.mjs",
+    "check:public-source": "node tools/public-source-check.mjs",
+    "licenses:inventory": "node tools/license-inventory.mjs",
+    "licenses:check": "node tools/license-inventory.mjs --check",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
+    "build:cloud": "vite build --config apps/desktop/vite.main.cloud.config.mts && vite build --config apps/desktop/vite.preload.cloud.config.mts && npm run build:renderer",
+    "start:cloud": "npm run build:cloud && node tools/start-cloud.mjs",
+    "build:native:fs": "node tools/build-windows-fs-native.mjs",
+    "build:main": "vite build --config apps/desktop/vite.main.config.mts",
+    "build:main:dev": "vite build --config apps/desktop/vite.main.dev.config.mts",
+    "build:preload": "vite build --config apps/desktop/vite.preload.config.mts",
+    "build:renderer": "vite build --config apps/desktop/vite.config.mts",
+    "build:tests": "tsc -p tests/tsconfig.json",
+    "dev": "npm run build:main:dev && npm run build:preload && node tools/dev-desktop.mjs",
+    "start": "npm run build && electron .",
+    "smoke": "npm run build && node tools/smoke-electron.mjs",
+    "smoke:dev": "npm run build:main:dev && npm run build:preload && node tools/dev-desktop.mjs --smoke",
+    "smoke:native:fs:electron": "node tools/smoke-windows-fs-native-electron.mjs",
+    "test": "npm run test:unit && npm run test:security",
+    "test:unit": "npm run build:tests && node --test \".local/test-build/tests/*.test.js\"",
+    "test:native:fs": "node --test \"tests/windows-fs-native*.test.mjs\"",
+    "test:security": "node tools/verify-security.mjs",
+    "verify:native:fs:binary": "node tools/verify-windows-fs-native-binary.mjs",
+    "typecheck": "tsc --noEmit -p apps/desktop/tsconfig.main.json && tsc --noEmit -p apps/desktop/tsconfig.main.dev.json && tsc --noEmit -p apps/desktop/tsconfig.main.cloud.json && tsc --noEmit -p apps/desktop/tsconfig.preload.json && tsc --noEmit -p apps/desktop/tsconfig.renderer.json && tsc --noEmit -p tests/tsconfig.json"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.11.0",
+    "@codemirror/search": "6.7.1",
+    "@codemirror/state": "6.7.1",
+    "@codemirror/view": "6.43.9",
+    "ajv": "8.20.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.1.0",
+    "electron": "43.4.0",
+    "typescript": "6.0.3",
+    "vite": "8.2.2"
+  }
+}

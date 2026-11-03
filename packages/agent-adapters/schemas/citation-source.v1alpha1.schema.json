@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.agent.citation-source/v1alpha1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceKind", "documentId", "revisionId"],
+      "properties": {
+        "sourceKind": { "const": "document" },
+        "documentId": { "$ref": "#/$defs/identity" },
+        "revisionId": { "$ref": "#/$defs/identity" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceKind", "artifactId", "revisionId"],
+      "properties": {
+        "sourceKind": { "enum": ["artifact", "reviewed_schematic"] },
+        "artifactId": { "$ref": "#/$defs/identity" },
+        "revisionId": { "$ref": "#/$defs/identity" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceKind", "corpusId", "sourceId", "sourceRevisionId"],
+      "properties": {
+        "sourceKind": { "const": "rag_source" },
+        "corpusId": { "$ref": "#/$defs/identity" },
+        "sourceId": { "$ref": "#/$defs/identity" },
+        "sourceRevisionId": { "$ref": "#/$defs/identity" }
+      }
+    }
+  ],
+  "$defs": {
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "types": ["node", "react", "react-dom"]
+  },
+  "include": [
+    "../apps/desktop/src/renderer/types/global.d.ts",
+    "phase3-p3d-*.ts",
+    "phase3-p3d-*.tsx",
+    "phase3-p3d-*.mts"
+  ]
+}

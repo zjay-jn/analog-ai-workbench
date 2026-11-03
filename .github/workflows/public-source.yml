@@ -1,0 +1,44 @@
+name: Public source checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-core-and-build:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.20.0'
+          cache: npm
+      - name: Pin npm
+        run: npm install --global npm@11.19.0 --ignore-scripts
+      - name: Verify toolchain versions
+        run: |
+          if ((node --version) -ne 'v24.20.0') { exit 1 }
+          if ((npm --version) -ne '11.19.0') { exit 1 }
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Audit the public source inventory and permission records
+        run: npm run release:audit
+      - name: Check all TypeScript profiles
+        run: npm run typecheck
+      - name: Run the bounded offline synthetic core suite
+        run: npm run test:public
+      - name: Test the public release tooling
+        run: npm run test:release
+      - name: Verify dependency license inventory
+        run: npm run licenses:check
+      - name: Check desktop source security boundaries
+        run: npm run test:security
+      - name: Bundle source profiles into isolated outputs
+        run: npm run check:public-source

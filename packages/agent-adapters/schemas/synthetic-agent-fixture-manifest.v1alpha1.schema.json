@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.agent.synthetic-fixture-manifest:v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractVersion", "canonicalizationVersion", "classification", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "aaw.agent.synthetic-fixture-manifest/v1alpha1" },
+    "contractVersion": { "const": "aaw.agent/v1alpha1" },
+    "canonicalizationVersion": { "const": "aaw-json-c14n/v1" },
+    "classification": { "const": "SYNTHETIC AGENT · NO MODEL · NO TOOLS" },
+    "entries": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "identity": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureId", "scenarioKind", "path", "byteLength", "rawSha256", "canonicalEventSha256", "canonicalPayloadSha256", "sourceRunId", "sourceEventId", "sourceSequence", "expectedOracleIds", "provenance", "license", "classification", "forbiddenRealDataAttestation", "ownerApprovals"],
+      "properties": {
+        "fixtureId": { "$ref": "#/$defs/identity" },
+        "scenarioKind": { "enum": ["accepted_text_completed", "citation_text", "citation_reviewed_schematic", "citation_rag_source", "invalid_source_time_warning", "cancel_terminal", "safe_replay_resume", "explicit_failure_recovery"] },
+        "path": { "type": "string", "pattern": "^packages/agent-adapters/fixtures/source-events/[a-z0-9-]+\\.json$" },
+        "byteLength": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+        "rawSha256": { "$ref": "#/$defs/sha256" },
+        "canonicalEventSha256": { "$ref": "#/$defs/sha256" },
+        "canonicalPayloadSha256": { "$ref": "#/$defs/sha256" },
+        "sourceRunId": { "$ref": "#/$defs/identity" },
+        "sourceEventId": { "$ref": "#/$defs/identity" },
+        "sourceSequence": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "expectedOracleIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^N(?:0[1-9]|[12][0-9]|30)$" } },
+        "provenance": { "const": "hand-authored-synthetic" },
+        "license": { "const": "MIT" },
+        "classification": { "enum": ["SYNTHETIC AGENT · NO MODEL · NO TOOLS", "SYNTHETIC RAG SOURCE"] },
+        "forbiddenRealDataAttestation": { "const": "contains-no-user-oa-pdk-netlist-rag-model-or-customer-data" },
+        "ownerApprovals": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^phase4-gate-sha256:[0-9a-f]{64}$" } }
+      }
+    }
+  }
+}

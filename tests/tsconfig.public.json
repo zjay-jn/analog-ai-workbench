@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../.local/public-test-build"
+  },
+  "include": [
+    "app-info-contract.test.ts",
+    "ipc-caller.test.ts",
+    "agent-engine-runtime-contract.test.ts",
+    "agent-project-read-text.test.ts",
+    "agent-project-read-protocol.test.ts",
+    "agent-project-read-stream-parser.test.ts",
+    "agent-k3-usage.test.ts",
+    "agent-k3-cache-write-usage.test.ts",
+    "agent-command-empty-delta.test.ts",
+    "agent-command-presentation.test.ts",
+    "agent-large-output-contract.test.ts",
+    "../apps/desktop/src/renderer/types/global.d.ts"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.agent.source-event/v1alpha1",
+  "$comment": "Pipeline precondition: a private copy of a bounded Uint8Array passes the strict decoder before this closed per-event-type schema. Runtime independently enforces UTF-8 byte budgets and rejects negative zero.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sourceSchemaVersion", "sourceCanonicalizationVersion", "sourceRunId", "sourceEventId", "sourceSequence", "sourcePayloadDigest", "type", "payload"],
+  "properties": {
+    "sourceSchemaVersion": { "const": "aaw.agent.source-event/v1alpha1" },
+    "sourceCanonicalizationVersion": { "const": "aaw-json-c14n/v1" },
+    "sourceRunId": { "$ref": "#/$defs/identity" },
+    "sourceEventId": { "$ref": "#/$defs/identity" },
+    "sourceSequence": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "sourcePayloadDigest": { "$ref": "#/$defs/sha256" },
+    "sourceOccurredAt": { "type": "string", "maxLength": 64, "pattern": "^[^\\u0000-\\u001F\\u007F]*$" },
+    "type": { "type": "string", "enum": ["message.delta", "citation.declared", "cancel.acknowledged", "run.completed", "run.failed"], "maxLength": 128 },
+    "payload": {}
+  },
+  "allOf": [{
+    "oneOf": [
+      { "properties": { "type": { "const": "message.delta" }, "payload": { "$ref": "#/$defs/messageDeltaPayload" } } },
+      { "properties": { "type": { "const": "citation.declared" }, "payload": { "$ref": "#/$defs/citationDeclaredPayload" } } },
+      { "properties": { "type": { "const": "cancel.acknowledged" }, "payload": { "$ref": "#/$defs/cancelAcknowledgedPayload" } } },
+      { "properties": { "type": { "const": "run.completed" }, "payload": { "$ref": "#/$defs/runCompletedPayload" } } },
+      { "properties": { "type": { "const": "run.failed" }, "payload": { "$ref": "#/$defs/runFailedPayload" } } }
+    ]
+  }],
+  "$defs": {
+    "identity": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "safeString": { "type": "string", "maxLength": 4096, "pattern": "^[^\\u0000-\\u001F\\u007F]*$" },
+    "messageDeltaPayload": { "type": "object", "additionalProperties": false, "required": ["text"], "properties": { "text": { "$ref": "#/$defs/safeString" } } },
+    "cancelAcknowledgedPayload": { "type": "object", "additionalProperties": false, "required": ["acknowledged"], "properties": { "acknowledged": { "const": true } } },
+    "runCompletedPayload": { "type": "object", "additionalProperties": false, "required": ["finishReason"], "properties": { "finishReason": { "const": "completed" } } },
+    "runFailedPayload": { "type": "object", "additionalProperties": false, "required": ["failureKind"], "properties": { "failureKind": { "enum": ["upstream_timeout", "rate_limited", "adapter_unavailable", "stream_interrupted"] } } },
+    "citationDeclaredPayload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["citationId", "source", "locator"],
+      "properties": { "citationId": { "$ref": "#/$defs/identity" }, "source": { "$ref": "#/$defs/citationSource" }, "locator": { "$ref": "#/$defs/citationLocator" } },
+      "allOf": [{ "oneOf": [
+        { "properties": { "source": { "$ref": "#/$defs/documentSource" }, "locator": { "oneOf": [{ "$ref": "#/$defs/textRangeLocator" }, { "$ref": "#/$defs/wholeSourceLocator" }] } } },
+        { "properties": { "source": { "$ref": "#/$defs/artifactSource" }, "locator": { "$ref": "#/$defs/wholeSourceLocator" } } },
+        { "properties": { "source": { "$ref": "#/$defs/reviewedSchematicSource" }, "locator": { "oneOf": [{ "$ref": "#/$defs/schematicElementLocator" }, { "$ref": "#/$defs/wholeSourceLocator" }] } } },
+        { "properties": { "source": { "$ref": "#/$defs/ragSource" }, "locator": { "oneOf": [{ "$ref": "#/$defs/ragChunkLocator" }, { "$ref": "#/$defs/wholeSourceLocator" }] } } }
+      ] }]
+    },
+    "citationSource": { "oneOf": [{ "$ref": "#/$defs/documentSource" }, { "$ref": "#/$defs/artifactSource" }, { "$ref": "#/$defs/reviewedSchematicSource" }, { "$ref": "#/$defs/ragSource" }] },
+    "documentSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "documentId", "revisionId"], "properties": { "sourceKind": { "const": "document" }, "documentId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" } } },
+    "artifactSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "artifactId", "revisionId"], "properties": { "sourceKind": { "const": "artifact" }, "artifactId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" } } },
+    "reviewedSchematicSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "artifactId", "revisionId"], "properties": { "sourceKind": { "const": "reviewed_schematic" }, "artifactId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" } } },
+    "ragSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "corpusId", "sourceId", "sourceRevisionId"], "properties": { "sourceKind": { "const": "rag_source" }, "corpusId": { "$ref": "#/$defs/identity" }, "sourceId": { "$ref": "#/$defs/identity" }, "sourceRevisionId": { "$ref": "#/$defs/identity" } } },
+    "citationLocator": { "oneOf": [{ "$ref": "#/$defs/textRangeLocator" }, { "$ref": "#/$defs/schematicElementLocator" }, { "$ref": "#/$defs/ragChunkLocator" }, { "$ref": "#/$defs/wholeSourceLocator" }] },
+    "codePointSpan": { "type": "object", "additionalProperties": false, "required": ["coordinateSystem", "start", "end"], "properties": { "coordinateSystem": { "const": "unicode_code_point" }, "start": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "end": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } } },
+    "textRangeLocator": { "type": "object", "additionalProperties": false, "required": ["locatorKind", "coordinateSystem", "start", "end"], "properties": { "locatorKind": { "const": "text_range" }, "coordinateSystem": { "const": "unicode_code_point" }, "start": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "end": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } } },
+    "schematicElementLocator": { "type": "object", "additionalProperties": false, "required": ["locatorKind", "occurrencePath", "definitionId", "elementKind", "elementId"], "properties": { "locatorKind": { "const": "schematic_element" }, "occurrencePath": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/identity" } }, "definitionId": { "$ref": "#/$defs/identity" }, "elementKind": { "$ref": "#/$defs/identity" }, "elementId": { "$ref": "#/$defs/identity" } } },
+    "ragChunkLocator": { "type": "object", "additionalProperties": false, "required": ["locatorKind", "chunkId"], "properties": { "locatorKind": { "const": "rag_chunk" }, "chunkId": { "$ref": "#/$defs/identity" }, "span": { "$ref": "#/$defs/codePointSpan" } } },
+    "wholeSourceLocator": { "type": "object", "additionalProperties": false, "required": ["locatorKind"], "properties": { "locatorKind": { "const": "whole_source" } } }
+  }
+}

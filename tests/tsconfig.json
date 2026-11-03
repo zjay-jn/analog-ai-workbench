@@ -1,0 +1,28 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "rootDir": "..",
+    "outDir": "../.local/test-build"
+  },
+  "include": [
+    "**/*.test.ts",
+    "../packages/document-contract/src/reviewed-identity.ts",
+    "../packages/schematic-workbench/src/canonical-json.ts",
+    "../packages/schematic-workbench/src/reviewed-circuit-ir.ts",
+    "../packages/schematic-workbench/src/strict-source-frame.ts",
+    "../packages/schematic-workbench/src/synthetic-admission.ts",
+    "../packages/schematic-workbench/src/viewer/**/*.ts",
+    "../apps/desktop/src/renderer/SchematicViewer.tsx",
+    "../apps/desktop/src/renderer/types/global.d.ts",
+    "../apps/desktop/src/shared/**/*.ts",
+    "../apps/desktop/src/main/ipc/get-info-contract.ts",
+    "../apps/desktop/src/main/document/**/*.ts",
+    "../apps/desktop/src/main/security/ipc-caller.ts",
+    "../apps/desktop/src/main/window-policy.ts"
+  ]
+}

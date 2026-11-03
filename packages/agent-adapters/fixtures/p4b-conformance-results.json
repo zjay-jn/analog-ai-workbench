@@ -1,0 +1,726 @@
+{
+  "contractVersion": "aaw.agent.conformance/v1alpha1",
+  "currentStage": "P4-B",
+  "results": [
+    {
+      "vectorId": "N01-exact-primary-replay",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N02-primary-key-sequence-conflict",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N03-secondary-key-identity-conflict",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N04-version-gate-before-identity",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N05-nested-host-run-id",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N05-nested-path-grant",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N05-nested-resolver-token",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N05-reserved-alias-rejected",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N06-exact-replay-zero-ledger-delta",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N07-late-old-transport-isolated",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N07-old-cursor-recovery-unsupported",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N07-old-source-replay-protocol-mismatch",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N08-duplicate-escape-equivalent-key",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N08-duplicate-literal-key",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N09-bom-forbidden",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N09-invalid-utf8",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N09-raw-control-forbidden",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N10-utf16-key-order",
+      "harness": "c14n",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N11-negative-zero-token",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N11-unsafe-integer-token",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N12-canonical-decimal-string",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N13-known-canonical-digest",
+      "harness": "c14n",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N14-full-tail-canonical-digest",
+      "harness": "c14n",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N15-isolated-surrogate",
+      "harness": "codec",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N16-reserved-canonical-field",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N17-invalid-semantic-time-warning",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N17-source-time-drift-invariant",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N17-strict-accepted-at-impossible-date",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N17-strict-accepted-at-leap-day",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-post-terminal-new-event",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-terminal-exact-replay-ack-only",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N19-before-commit-restart",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N20-after-commit-before-ack-restart",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N21-ledger-corruption-quarantine",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N22-production-registry-empty",
+      "harness": "build_gate",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N23-privileged-brokers-unreachable",
+      "harness": "build_gate",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N24-public-surface-forbidden-fields",
+      "harness": "surface_scan",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-authorized-kind-corruption",
+      "harness": "desktop_boundary",
+      "requiredStage": "P4-C",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N25-exact-revision-caller-order",
+      "harness": "desktop_boundary",
+      "requiredStage": "P4-C",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N25-generic-artifact-resolve-contract",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-historical-exact-revision",
+      "harness": "desktop_boundary",
+      "requiredStage": "P4-C",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N25-incompatible-source-locator",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-intent-capability-after-valid-locator",
+      "harness": "desktop_boundary",
+      "requiredStage": "P4-C",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N25-invalid-locator-before-intent-capability",
+      "harness": "desktop_boundary",
+      "requiredStage": "P4-C",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N25-latest-revision-rejected",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-path-fallback-rejected",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-public-resolve-contract",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-resolve-error-message-binding-pass",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-resolve-error-message-mismatch",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N25-wrong-caller-scope-denied",
+      "harness": "desktop_boundary",
+      "requiredStage": "P4-C",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N26-adapter-retry-fields-rejected",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N26-illegal-main-pair-first-trigger",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N26-nested-retry-recovery",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N26-quarantine-subsequent-recovery",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N27-retry-recovery-priority",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N27-tool-state-machine-contract",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-monotonic-deadline-metamorphic",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N29-data-hygiene-canary-scan",
+      "harness": "surface_scan",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-artifacts-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-artifacts-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-artifacts-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-canonical-payload-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-canonical-payload-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-canonical-payload-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-citations-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-citations-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-citations-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-context-refs-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-context-refs-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-context-refs-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-input-refs-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-input-refs-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-input-refs-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-json-depth-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-json-depth-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-json-depth-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-preview-code-points-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-preview-code-points-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-preview-code-points-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-preview-utf8-bytes-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-preview-utf8-bytes-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-preview-utf8-bytes-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-queued-bytes-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-queued-bytes-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-queued-bytes-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-queued-events-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-queued-events-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-queued-events-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-raw-frame-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-raw-frame-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-raw-frame-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-run-events-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-run-events-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-run-events-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-string-bytes-limit",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-string-bytes-limit-1",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-budget-string-bytes-limit-plus-one",
+      "harness": "schema",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-after-zero",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-omitted-after-zero",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-head-nonterminal-wait",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-head-terminal-end",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-future-after-invalid",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-retention-gap-start-new-run",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-retention-gap-recovery-unsupported",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-quarantined-zero",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N18-host-replay-snapshot-tail-exactly-once",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N19-cancel-before-commit-restart",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N20-cancel-after-commit-before-ack-restart",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N21-mapping-only-corruption-quarantine",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N21-event-only-corruption-quarantine",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N21-checkpoint-only-corruption-quarantine",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N21-ack-before-commit-corruption-quarantine",
+      "harness": "ledger_recovery",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-cancel-before-stream",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-cancel-during-delta",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-cancel-repeated-idempotent",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-cancel-ack-terminal-once",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-cancel-after-terminal-noop",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N28-cancel-timeout-late-event-isolated",
+      "harness": "reducer",
+      "requiredStage": "P4-B",
+      "status": "PASS"
+    },
+    {
+      "vectorId": "N30-electron-boundary-offline",
+      "harness": "electron_boundary",
+      "requiredStage": "P4-D",
+      "status": "NOT_RUN"
+    },
+    {
+      "vectorId": "N30-public-api-schema-snapshot",
+      "harness": "surface_scan",
+      "requiredStage": "P4-A",
+      "status": "PASS"
+    }
+  ]
+}

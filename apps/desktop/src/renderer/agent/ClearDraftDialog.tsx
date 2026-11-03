@@ -1,0 +1,4 @@
+import {useEffect,useRef,useState} from 'react';
+export function ClearDraftDialog({title,onClose,onClear}:{title:string;onClose:()=>void;onClear:()=>Promise<boolean>}){const ref=useRef<HTMLDialogElement>(null),[pending,setPending]=useState(false),[error,setError]=useState('');useEffect(()=>{ref.current?.showModal();return()=>ref.current?.close();},[]);
+ return <dialog ref={ref} className="session-dialog" aria-label="清空聊天草稿" onCancel={e=>{e.preventDefault();if(!pending)onClose();}}><h2>清空草稿</h2><p>清空“{title}”尚未发送的文字和附件？已经保存的聊天记录会保留。</p>{error&&<p role="alert">{error}</p>}<div className="session-dialog-actions"><button type="button" autoFocus disabled={pending} onClick={onClose}>取消</button><button type="button" disabled={pending} onClick={()=>{setPending(true);void onClear().then(ok=>{if(ok)onClose();else setError('草稿清理未确认成功，请先保留重要输入。');}).finally(()=>setPending(false));}}>确认清空草稿</button></div></dialog>;
+}

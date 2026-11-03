@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "rootDir": "../..",
+    "outDir": "../../dist/preload"
+  },
+  "include": ["src/preload/**/*.ts", "src/shared/**/*.ts"]
+}

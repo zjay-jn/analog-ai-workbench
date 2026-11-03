@@ -1,0 +1,17 @@
+# C-1 Windows analysis runner
+
+The first runtime is the existing pinned Node 24.20.0 executable. The main-only WorkCycleRunner executes JavaScript; model supplied executables, host paths, environments, commands and resource limits are not accepted.
+
+The native launcher creates a unique zero-capability AppContainer profile with a durable creation intent and successful ownership receipt. Only the corresponding per-user/per-app profile and mapping are created and deleted through Windows APIs. New product .local runtime copies (read/execute), immutable input snapshots (read) and execution output directories (read/write) receive the exact SID. Shared runtime/user/system parent directory ACLs, accounts, services and firewall policy are unchanged. Original local ACLs and object identities are recorded before grants, restored through SetSecurityInfo, and all final states are verified after every restore.
+
+Creation uses zero SECURITY_CAPABILITIES, an explicit stdio handle list and atomic PROC_THREAD_ATTRIBUTE_JOB_LIST. Before resuming the suspended process, the launcher verifies AppContainer SID, zero capabilities, low integrity and JobObject membership. Failure closes the job and never falls back. The job denies breakaway and limits process count and memory. Timeout, cancellation, parent loss and output limits terminate the job; completion requires zero active job processes.
+
+The native result records actual exit code, reason, duration, bounded stdout/stderr and isolation/cleanup proof. Main pins the launcher/runtime, validates the native result and returns the existing typed result. Workspace code verifies ordinary output files and provenance separately.
+
+The fixed child command is `node.exe --no-addons --no-global-search-paths --preserve-symlinks-main <runtime>/program.cjs`, with `DETACHED_PROCESS` and three explicit stdio pipes. The `.js` input is copied byte-exactly to the pinned private `.cjs` entry; cwd is the readonly input, with `AAW_INPUT_DIR` and `AAW_OUTPUT_DIR` giving the two task paths. Native checks and holds every no-link path component before launch. The main-only loader flag avoids Node re-statting ungranted drive ancestors; it does not relax those native checks. No console or hidden conhost is allocated. Cancellation is a `C` byte or EOF on the launcher control pipe.
+
+The 256 KiB output limit is a monitored and accepted-artifact limit, not a kernel disk quota; writes can exceed it between checks. AppContainer can access some shared Windows resources, so this is not an empty filesystem. Availability requires a real synthetic execution and cleanup proof bound to the final binary. The failed profileless probe remains historical evidence. Native budgets are generated from WORK_CYCLE_LIMITS, including one process per job; the process-creation policy also denies child processes.
+
+The initial probe only calculates arithmetic and writes a new artifact inside its own output directory. Focused follow-ups cover outside-task/runtime writes, network permission, timeout/cancellation and process-group cleanup. No API, credential, user project or EDA data is involved.
+
+The independent native batch has five fixed cases, a 90-second batch deadline and at most five additional seconds for cleanup. A main-owned localhost positive control closes before the analysis connection counter begins; child/network assertions preserve the observed Windows error fields and require no child sentinel or accepted analysis connection. These facts are scoped to that fixed runtime and synthetic destination.

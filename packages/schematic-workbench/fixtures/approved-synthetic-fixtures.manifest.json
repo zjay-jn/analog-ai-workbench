@@ -1,0 +1,257 @@
+{
+  "schemaVersion": "aaw.synthetic-fixture-manifest/v1alpha1",
+  "canonicalizationVersion": "aaw-json-c14n/v1",
+  "manifestId": "aaw.synthetic.reviewed-fixtures/v1",
+  "issuerId": "aaw.main.fixture-registry/v1",
+  "receiptClass": "synthetic_fixture_admission",
+  "entries": [
+    {
+      "fixtureId": "flat-basic",
+      "relativePath": "packages/schematic-workbench/fixtures/flat-basic.json",
+      "byteLength": 441,
+      "rawSha256": "sha256:e7a602fb696a136c1f37b06eec074770168ca0b7b4cf12891c0c06b96f5f3afb",
+      "payloadDigest": "sha256:9a39d13b7d1e58ca44cf92500c6cbb307695a36d9f6c2568e6d8698b0070ea86",
+      "documentRef": {
+        "documentId": "synthetic.schematic.flat-basic",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.flat-basic",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.flat-basic.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 1, "entities": 1, "nets": 1, "references": 0 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.flat-net"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "repeated-hierarchy",
+      "relativePath": "packages/schematic-workbench/fixtures/repeated-hierarchy.json",
+      "byteLength": 873,
+      "rawSha256": "sha256:83c089f5a0d8092a37502e996b6a1db57750973cd32d364c489a70347c8f10e3",
+      "payloadDigest": "sha256:1c485a678ccf8061db20838959296b44eb65be3524314cc48efcb000f755cc71",
+      "documentRef": {
+        "documentId": "synthetic.schematic.repeated-hierarchy",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.repeated-hierarchy",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.repeated-hierarchy.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 2, "entities": 3, "nets": 1, "references": 4 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.repeated-occurrence-paths"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "same-label-different-net",
+      "relativePath": "packages/schematic-workbench/fixtures/same-label-different-net.json",
+      "byteLength": 890,
+      "rawSha256": "sha256:7854fcfca705616a2b33e743e4745f6ed2ff9584e3fa3188aef932e8a4220d6d",
+      "payloadDigest": "sha256:8549da7eebf70dfcadaf24f37eb963e789a1497e84dd6fecaacfef3f1f73a405",
+      "documentRef": {
+        "documentId": "synthetic.schematic.same-label-different-net",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.same-label-different-net",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.same-label-different-net.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 1, "entities": 10, "nets": 2, "references": 10 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.same-label-distinct-net"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "blackbox-child",
+      "relativePath": "packages/schematic-workbench/fixtures/blackbox-child.json",
+      "byteLength": 541,
+      "rawSha256": "sha256:9e8239ed6906203d51d5ad0a7f4c12de7f13ca75f348df4b4000ae20561ad0fc",
+      "payloadDigest": "sha256:ffedf152272bf4d61058db28b9670b6eeb3adb3fc81dc595973be8725d31c98b",
+      "documentRef": {
+        "documentId": "synthetic.schematic.blackbox-child",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.blackbox-child",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.blackbox-child.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 1, "entities": 1, "nets": 0, "references": 1 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.blackbox-nonnavigable"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "explicit-port-mapping",
+      "relativePath": "packages/schematic-workbench/fixtures/explicit-port-mapping.json",
+      "byteLength": 1156,
+      "rawSha256": "sha256:0bf704487b5570d26a1b9f272a78b0a6334e94a1cad0386a71dfabe25ce48976",
+      "payloadDigest": "sha256:814fae8e4b12f22b80cc69a41bfcba0a8553877462fe99991836bd71f5963458",
+      "documentRef": {
+        "documentId": "synthetic.schematic.explicit-port-mapping",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.explicit-port-mapping",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.explicit-port-mapping.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 2, "entities": 5, "nets": 2, "references": 12 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.parent-terminal-port-mapping"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "empty-minimum",
+      "relativePath": "packages/schematic-workbench/fixtures/empty-minimum.json",
+      "byteLength": 397,
+      "rawSha256": "sha256:2c0599b28f60eb7fdfcec65e42906847dfc7420d48886b5d58cc4fc72deb890e",
+      "payloadDigest": "sha256:4c6f7dc2917f8be2cbb85dd046c2d4eed1751b5864148e29240e87a6d3d88920",
+      "documentRef": {
+        "documentId": "synthetic.schematic.empty-minimum",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.empty-minimum",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.empty-minimum.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 1, "entities": 0, "nets": 0, "references": 0 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.empty-minimum"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "max-boundary",
+      "relativePath": "packages/schematic-workbench/fixtures/max-boundary.json",
+      "byteLength": 525,
+      "rawSha256": "sha256:84a853ed1b5ff75b01936f70d19a18a69785461c525f8c4f47060b5c361bde62",
+      "payloadDigest": "sha256:316439bd92f714d2c802437aa784c89b55b56ef3214d2cdb5af1e100c694311a",
+      "documentRef": {
+        "documentId": "synthetic.schematic.max-boundary",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.max-boundary",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.max-boundary.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 1, "entities": 1, "nets": 1, "references": 0 },
+      "limitOracle": {
+        "mode": "generated-boundary",
+        "declaredBoundary": "Tests generate the exact 8388608-byte raw-frame boundary; this committed fixture remains small."
+      },
+      "expectedSemanticOracleIds": ["oracle.generated-eight-mibibyte-boundary", "oracle.coordinate-max-boundary"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    },
+    {
+      "fixtureId": "unicode-labels",
+      "relativePath": "packages/schematic-workbench/fixtures/unicode-labels.json",
+      "byteLength": 678,
+      "rawSha256": "sha256:9b88e225d66ce7001c3d6dfc64e31c245bb3d0b0a37e8835dbb82675c2c8900a",
+      "payloadDigest": "sha256:3b11de47f03aad63877a787f1108164c5499d4408a47086f2d839ee9ab3337ed",
+      "documentRef": {
+        "documentId": "synthetic.schematic.unicode-labels",
+        "revisionId": "rev-1",
+        "documentKind": "schematic_reviewed"
+      },
+      "artifactRef": {
+        "artifactId": "synthetic.circuit-ir.unicode-labels",
+        "revisionId": "rev-1",
+        "artifactKind": "circuit_ir_reviewed"
+      },
+      "receiptId": "receipt.synthetic.unicode-labels.v1",
+      "schemaVersion": "aaw.circuit-ir.reviewed/v1alpha1",
+      "canonicalizationVersion": "aaw-json-c14n/v1",
+      "provenance": "hand-authored-synthetic",
+      "license": "CC0-1.0",
+      "issuerId": "aaw.main.fixture-registry/v1",
+      "counts": { "definitions": 1, "entities": 5, "nets": 1, "references": 5 },
+      "limitOracle": {
+        "mode": "inline-small",
+        "declaredBoundary": "Committed raw frame remains below the 8388608-byte admission ceiling."
+      },
+      "expectedSemanticOracleIds": ["oracle.unicode-label-plain-text"],
+      "forbiddenRealDataAttestation": "hand-authored; contains no real OA/PDK/netlist/reviewed/candidate data",
+      "ownerApprovals": ["reviewed-schematic-owner", "security-qa-owner"]
+    }
+  ]
+}

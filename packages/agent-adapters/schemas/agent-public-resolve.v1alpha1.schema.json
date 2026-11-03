@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aaw.agent.public-resolve/v1alpha1",
+  "oneOf": [
+    { "$ref": "#/$defs/documentRef" },
+    { "$ref": "#/$defs/artifactRef" },
+    { "$ref": "#/$defs/citationRef" },
+    { "$ref": "#/$defs/resolveDocumentRequest" },
+    { "$ref": "#/$defs/resolveArtifactRequest" },
+    { "$ref": "#/$defs/resolveCitationRequest" },
+    { "$ref": "#/$defs/resolveSuccess" },
+    { "$ref": "#/$defs/resolveFailure" }
+  ],
+  "$defs": {
+    "identity": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "documentRef": { "type": "object", "additionalProperties": false, "required": ["documentId", "revisionId", "documentKind"], "properties": { "documentId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" }, "documentKind": { "enum": ["text", "schematic_reviewed"] } } },
+    "artifactRef": { "type": "object", "additionalProperties": false, "required": ["artifactId", "revisionId", "artifactKind"], "properties": { "artifactId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" }, "artifactKind": { "enum": ["circuit_ir_reviewed", "generic"] } } },
+    "documentSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "documentId", "revisionId"], "properties": { "sourceKind": { "const": "document" }, "documentId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" } } },
+    "artifactSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "artifactId", "revisionId"], "properties": { "sourceKind": { "const": "artifact" }, "artifactId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" } } },
+    "reviewedSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "artifactId", "revisionId"], "properties": { "sourceKind": { "const": "reviewed_schematic" }, "artifactId": { "$ref": "#/$defs/identity" }, "revisionId": { "$ref": "#/$defs/identity" } } },
+    "ragSource": { "type": "object", "additionalProperties": false, "required": ["sourceKind", "corpusId", "sourceId", "sourceRevisionId"], "properties": { "sourceKind": { "const": "rag_source" }, "corpusId": { "$ref": "#/$defs/identity" }, "sourceId": { "$ref": "#/$defs/identity" }, "sourceRevisionId": { "$ref": "#/$defs/identity" } } },
+    "citationSource": { "oneOf": [{ "$ref": "#/$defs/documentSource" }, { "$ref": "#/$defs/artifactSource" }, { "$ref": "#/$defs/reviewedSource" }, { "$ref": "#/$defs/ragSource" }] },
+    "wholeSource": { "type": "object", "additionalProperties": false, "required": ["locatorKind"], "properties": { "locatorKind": { "const": "whole_source" } } },
+    "textRange": { "type": "object", "additionalProperties": false, "required": ["locatorKind", "coordinateSystem", "start", "end"], "properties": { "locatorKind": { "const": "text_range" }, "coordinateSystem": { "const": "unicode_code_point" }, "start": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "end": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } } },
+    "span": { "type": "object", "additionalProperties": false, "required": ["coordinateSystem", "start", "end"], "properties": { "coordinateSystem": { "const": "unicode_code_point" }, "start": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, "end": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } } },
+    "schematicElement": { "type": "object", "additionalProperties": false, "required": ["locatorKind", "occurrencePath", "definitionId", "elementKind", "elementId"], "properties": { "locatorKind": { "const": "schematic_element" }, "occurrencePath": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/identity" } }, "definitionId": { "$ref": "#/$defs/identity" }, "elementKind": { "$ref": "#/$defs/identity" }, "elementId": { "$ref": "#/$defs/identity" } } },
+    "ragChunk": { "type": "object", "additionalProperties": false, "required": ["locatorKind", "chunkId"], "properties": { "locatorKind": { "const": "rag_chunk" }, "chunkId": { "$ref": "#/$defs/identity" }, "span": { "$ref": "#/$defs/span" } } },
+    "citationLocator": { "oneOf": [{ "$ref": "#/$defs/wholeSource" }, { "$ref": "#/$defs/textRange" }, { "$ref": "#/$defs/schematicElement" }, { "$ref": "#/$defs/ragChunk" }] },
+    "preview": { "type": "object", "additionalProperties": false, "required": ["text", "truncated", "authority"], "properties": { "text": { "type": "string", "maxLength": 512, "pattern": "^[^\\u0000-\\u001F\\u007F]*$" }, "truncated": { "type": "boolean" }, "authority": { "const": "non_authoritative" } }, "$comment": "Runtime also enforces 2048 UTF-8 bytes." },
+    "citationRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["citationId", "source", "locator", "authorityStatus", "verificationStatus"],
+      "properties": { "citationId": { "$ref": "#/$defs/identity" }, "source": { "$ref": "#/$defs/citationSource" }, "locator": { "$ref": "#/$defs/citationLocator" }, "authorityStatus": { "enum": ["authoritative", "non_authoritative"] }, "verificationStatus": { "enum": ["unverified", "verified", "unavailable"] }, "retrievalId": { "$ref": "#/$defs/identity" }, "preview": { "$ref": "#/$defs/preview" } },
+      "allOf": [
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "document" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "oneOf": [{ "$ref": "#/$defs/textRange" }, { "$ref": "#/$defs/wholeSource" }] } } } },
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "artifact" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "$ref": "#/$defs/wholeSource" } } } },
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "reviewed_schematic" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "oneOf": [{ "$ref": "#/$defs/schematicElement" }, { "$ref": "#/$defs/wholeSource" }] } } } },
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "rag_source" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "oneOf": [{ "$ref": "#/$defs/ragChunk" }, { "$ref": "#/$defs/wholeSource" }] } } } }
+      ]
+    },
+    "resolveDocumentRequest": { "type": "object", "additionalProperties": false, "required": ["target", "intent"], "properties": { "target": { "$ref": "#/$defs/documentRef" }, "intent": { "enum": ["open", "preview", "inspect"] } } },
+    "resolveArtifactRequest": { "type": "object", "additionalProperties": false, "required": ["target", "intent"], "properties": { "target": { "$ref": "#/$defs/artifactRef" }, "intent": { "enum": ["open", "preview", "inspect"] } } },
+    "resolveCitationRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "locator", "intent"],
+      "properties": { "source": { "$ref": "#/$defs/citationSource" }, "locator": { "$ref": "#/$defs/citationLocator" }, "intent": { "enum": ["preview_source", "open_source", "highlight_locator"] } },
+      "allOf": [
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "document" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "oneOf": [{ "$ref": "#/$defs/textRange" }, { "$ref": "#/$defs/wholeSource" }] } } } },
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "artifact" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "$ref": "#/$defs/wholeSource" } } } },
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "reviewed_schematic" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "oneOf": [{ "$ref": "#/$defs/schematicElement" }, { "$ref": "#/$defs/wholeSource" }] } } } },
+        { "if": { "type": "object", "properties": { "source": { "type": "object", "properties": { "sourceKind": { "const": "rag_source" } }, "required": ["sourceKind"] } }, "required": ["source"] }, "then": { "type": "object", "properties": { "locator": { "oneOf": [{ "$ref": "#/$defs/ragChunk" }, { "$ref": "#/$defs/wholeSource" }] } } } }
+      ]
+    },
+    "resolveSuccess": { "type": "object", "additionalProperties": false, "required": ["ok", "value"], "properties": { "ok": { "const": true }, "value": { "type": "object", "additionalProperties": false, "required": ["freshness", "action"], "properties": { "freshness": { "enum": ["current", "historical"] }, "action": { "enum": ["open", "preview", "inspect", "preview_source", "open_source", "highlight_locator"] } } } } },
+    "resolveInvalidRequestError": { "type": "object", "additionalProperties": false, "required": ["code", "message", "retryability", "recoveryAction"], "properties": { "code": { "const": "INVALID_REQUEST" }, "message": { "const": "Request is invalid" }, "retryability": { "const": "never" }, "recoveryAction": { "const": "none" } } },
+    "resolveCapabilityDeniedError": { "type": "object", "additionalProperties": false, "required": ["code", "message", "retryability", "recoveryAction"], "properties": { "code": { "const": "CAPABILITY_DENIED" }, "message": { "const": "Requested resource is unavailable" }, "retryability": { "const": "never" }, "recoveryAction": { "const": "none" } } },
+    "resolveRevisionUnavailableError": { "type": "object", "additionalProperties": false, "required": ["code", "message", "retryability", "recoveryAction"], "properties": { "code": { "const": "REVISION_UNAVAILABLE" }, "message": { "const": "Requested revision is unavailable" }, "retryability": { "const": "never" }, "recoveryAction": { "const": "none" } } },
+    "resolveInternalError": { "type": "object", "additionalProperties": false, "required": ["code", "message", "retryability", "recoveryAction"], "properties": { "code": { "const": "INTERNAL" }, "message": { "const": "Request could not be completed" }, "retryability": { "const": "never" }, "recoveryAction": { "const": "none" } } },
+    "resolveFailure": { "type": "object", "additionalProperties": false, "required": ["ok", "error"], "properties": { "ok": { "const": false }, "error": { "oneOf": [{ "$ref": "#/$defs/resolveInvalidRequestError" }, { "$ref": "#/$defs/resolveCapabilityDeniedError" }, { "$ref": "#/$defs/resolveRevisionUnavailableError" }, { "$ref": "#/$defs/resolveInternalError" }] } } }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://analog-ai-workbench.invalid/schemas/reviewed-identity.v1.schema.json",
+  "title": "Analog AI Workbench Reviewed Identity Binding V1",
+  "$ref": "#/$defs/reviewedIdentityBindingV1",
+  "$defs": {
+    "identityComponentV1": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!latest$)[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "reviewedDocumentRefV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentId", "revisionId", "documentKind"],
+      "properties": {
+        "documentId": {
+          "$ref": "#/$defs/identityComponentV1"
+        },
+        "revisionId": {
+          "$ref": "#/$defs/identityComponentV1"
+        },
+        "documentKind": {
+          "const": "schematic_reviewed"
+        }
+      }
+    },
+    "reviewedArtifactRefV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "revisionId", "artifactKind"],
+      "properties": {
+        "artifactId": {
+          "$ref": "#/$defs/identityComponentV1"
+        },
+        "revisionId": {
+          "$ref": "#/$defs/identityComponentV1"
+        },
+        "artifactKind": {
+          "const": "circuit_ir_reviewed"
+        }
+      }
+    },
+    "reviewedIdentityBindingV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentRef", "artifactRef", "freshness"],
+      "properties": {
+        "documentRef": {
+          "$ref": "#/$defs/reviewedDocumentRefV1"
+        },
+        "artifactRef": {
+          "$ref": "#/$defs/reviewedArtifactRefV1"
+        },
+        "freshness": {
+          "enum": ["current", "historical"]
+        }
+      }
+    }
+  }
+}

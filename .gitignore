@@ -1,0 +1,63 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Desktop/web build outputs
+dist/
+build/
+out/
+release/
+.vite/
+.webpack/
+coverage/
+
+# Rust/Python optional tooling outputs
+target/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local application state and user content
+.local/
+local-data/
+workspace-state/
+artifacts/
+exports/
+staging/
+logs/
+*.log
+
+# Models, indexes, databases and EDA payloads
+models/
+weights/
+checkpoints/
+vector-indexes/
+*.bin
+*.safetensors
+*.ckpt
+*.sqlite
+*.sqlite3
+*.db
+*.oa
+psf/
+netlist/
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+secrets/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
