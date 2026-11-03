@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {runtimePaths} from './runtime-paths';
+import {packagedContext, packagedRuntimeComponent} from './packaged-admission';
 
 export type RuntimePin = Readonly<{path: string; bytes: number; sha256: string}>;
 export type RuntimeComponentId = 'opencode' | 'guardian' | 'windowsFs' | 'commandRunner' | 'workRunner' | 'workProof' | 'node' | 'nodeLicense' | 'commandBootstrap' | 'commandAdmission';
@@ -58,11 +59,13 @@ function pin(value: unknown): RuntimePin {
   return Object.freeze({path: file, bytes: item.bytes, sha256: item.sha256});
 }
 export function runtimeManifestPin(): RuntimePin {
+  if (runtimePaths().mode === 'packaged') {const pin = packagedContext().distribution.pin; const bytes = read(pin.path, pin.bytes); if (digest(bytes) !== pin.sha256) fail(); return pin;}
   const file = path.join(runtimePaths().runtimeRoot, 'runtime-manifest.json'), bytes = read(file, 1024*1024);
   return Object.freeze({path: file, bytes: bytes.length, sha256: digest(bytes)});
 }
 export function runtimeManifest(): Manifest {
   try {
+    if (runtimePaths().mode !== 'source') fail();
     const proof = runtimeManifestPin(), manifest = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(read(proof.path, proof.bytes))) as Manifest;
     if (manifest.schemaVersion !== 'aaw.desktop-runtime/v1' || manifest.platform !== 'win32' || manifest.arch !== 'x64'
       || manifest.nodeVersion !== '24.20.0' || manifest.dataRoot !== runtimePaths().dataRoot || !manifest.components
@@ -85,6 +88,7 @@ export function runtimeManifest(): Manifest {
 /** Installation is explicit. Missing, moved or changed components remain unavailable. */
 export function runtimeComponent(id: RuntimeComponentId): RuntimePin {
   try {
+    if (runtimePaths().mode === 'packaged') return packagedRuntimeComponent(id);
     const manifest = runtimeManifest(), item = manifest.components[id];
     if (!item) return fail();
     if (item.path !== locations[id] || !Array.isArray(item.sources) || item.sources.length > 16) fail();

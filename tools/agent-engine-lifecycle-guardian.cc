@@ -2,7 +2,9 @@
 #include <cstdio>
 using namespace aaw;
 namespace {
-#ifdef AAW_PORTABLE_RUNTIME
+#ifdef AAW_PACKAGED_RUNTIME
+std::wstring engineImage;
+#elif defined(AAW_PORTABLE_RUNTIME)
 const std::wstring engineImage=installationRuntime+L"opencode\\1.18.17\\opencode.exe";
 #else
 const std::wstring engineImage=productLocal+L"agent-engine-candidate-v1.18.17\\opencode.exe";
@@ -67,6 +69,9 @@ int wmain(int argc,wchar_t** argv){
     if(!GetExitCodeProcess(child.h,&exitCode))return false;engineExited=true;return true;
   };
   try{
+#ifdef AAW_PACKAGED_RUNTIME
+    InitializePackagedRuntime(L"guardian.exe");engineImage=installationRuntime+L"opencode\\1.18.17\\opencode.exe";
+#endif
     Require(argc==3,"arguments");root=argv[1];const auto prefix=productLocal+L"agent-engine-pilot\\native\\";
     Require(root.rfind(prefix,0)==0&&Uuid(root.substr(prefix.size())),"engine_root");nonce=root.substr(prefix.size());port=Port(argv[2]);
     Stage("paths");LockAncestors(root+L"\\cwd");LockAncestors(engineImage);rootPin=Open(root,true);cwdPin=Open(root+L"\\cwd",true);

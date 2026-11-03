@@ -19,8 +19,12 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#ifdef AAW_PORTABLE_RUNTIME
+#if defined(AAW_PORTABLE_RUNTIME) && !defined(AAW_PACKAGED_RUNTIME)
 #include "runtime-paths.h"
+#endif
+#ifdef AAW_PACKAGED_RUNTIME
+#include "packaged-native-runtime.h"
+namespace portable_runtime {inline std::wstring systemRoot;}
 #endif
 
 namespace aaw {
@@ -36,7 +40,10 @@ struct Handle {
 };
 void Check(bool okay,const char* stage){if(!okay)throw std::runtime_error(std::string(stage)+":"+std::to_string(GetLastError()));}
 void Require(bool okay,const char* stage){if(!okay)throw std::runtime_error(stage);}
-#ifdef AAW_PORTABLE_RUNTIME
+#ifdef AAW_PACKAGED_RUNTIME
+std::wstring productLocal,installationRuntime;
+void InitializePackagedRuntime(const wchar_t* expectedImage){const auto& roots=packaged_runtime::Initialize(expectedImage);productLocal=roots.dataRoot+L"\\";installationRuntime=roots.runtimeRoot+L"\\";portable_runtime::systemRoot=roots.systemRoot;}
+#elif defined(AAW_PORTABLE_RUNTIME)
 const std::wstring productLocal=portable_runtime::dataLocal;
 const std::wstring installationRuntime=portable_runtime::installationRuntime;
 #else

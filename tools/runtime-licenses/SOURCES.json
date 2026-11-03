@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "aaw.runtime-notice-sources/v1",
+  "opencode": {
+    "version": "1.18.17",
+    "sourceCommit": "02546dfc2e4515a4f90aaf9ceb3890df2ac2b479"
+  },
+  "bun": {
+    "version": "1.3.14",
+    "versionEvidence": "Fixed official OpenCode executable with BUN_BE_BUN=1 --version; isolated no-key environment, exit 0."
+  },
+  "files": [
+    {
+      "file": "OPENCODE-1.18.17-LICENSE.md",
+      "url": "https://api.github.com/repos/anomalyco/opencode/contents/LICENSE?ref=v1.18.17",
+      "upstreamBlob": "6439474beed8e0271df9862eff97ffd70ec2464c",
+      "bytes": 1065,
+      "sha256": "625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b"
+    },
+    {
+      "file": "BUN-1.3.14-LICENSE.md",
+      "url": "https://api.github.com/repos/oven-sh/bun/contents/LICENSE.md?ref=bun-v1.3.14",
+      "upstreamBlob": "81069ee8d3b84f21ee32b2a9766643e1de114863",
+      "bytes": 5376,
+      "sha256": "2c6160ec8fb853f7e8f97d9b249e756c9b0ac44860a68b6bf4f1b0bcbc5c3741"
+    }
+  ]
+}

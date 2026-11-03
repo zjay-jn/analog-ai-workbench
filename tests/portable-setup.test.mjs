@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {parseOptions,ordinary,publish,download,layout,ref} from '../tools/portable-runtime-lib.mjs';
 import {installedElectron} from '../tools/electron-runtime.mjs';
+import {portableWorkSelfTestPaths} from '../tools/portable-native-build.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const temporary=path.join(root,'.local/portable-setup-tests');fs.mkdirSync(temporary,{recursive:true});
@@ -43,6 +44,17 @@ test('setup keeps storage separate from installation',()=>{
   if(process.platform!=='win32')return;
   assert.throws(()=>layout(root,root),/INSTALL_AND_STORAGE_ROOTS_MUST_BE_SEPARATE/);
   assert.throws(()=>layout(root,path.join(root,'userdata')),/INSTALL_AND_STORAGE_ROOTS_MUST_BE_SEPARATE/);
+});
+test('work setup self-test receipts stay in the native test scope outside the production execution ledger',()=>{
+  const folder=fixture(),dataRoot=path.join(folder,'.local'),buildId='11111111-2222-4333-8444-555555555555',id='wce-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const scope=portableWorkSelfTestPaths({dataRoot},buildId,id),testRoot=path.join(dataRoot,'agent-work-cycle-runner/native-tests'),production=path.join(dataRoot,'agent-work-cycle-runner/executions');
+  // Match the existing native Parse whitelist: <UUID>/executions/<same wce-id>.
+  assert.equal(path.relative(testRoot,scope.execution).replaceAll('\\','/'),buildId+'/executions/'+id);
+  assert.equal(scope.runtime,path.join(scope.execution,'runtime'));assert(path.relative(production,scope.execution).startsWith('..'+path.sep));
+  fs.mkdirSync(scope.execution,{recursive:true});fs.writeFileSync(path.join(scope.execution,'cleanup.json'),'{"synthetic":true}');
+  assert.equal(fs.existsSync(production),false);assert.equal(fs.readFileSync(path.join(scope.execution,'cleanup.json'),'utf8'),'{"synthetic":true}');
+  assert.throws(()=>portableWorkSelfTestPaths({dataRoot},'../executions',id),/WORK_SELF_TEST_IDENTITY/);
+  assert.throws(()=>portableWorkSelfTestPaths({dataRoot},buildId,'../production-id'),/WORK_SELF_TEST_IDENTITY/);
 });
 test('Electron diagnosis reads fixed files without importing an installer',()=>{
   const folder=fixture(),dependency=path.join(folder,'node_modules/electron'),marker=path.join(folder,'unexpected-install.txt');

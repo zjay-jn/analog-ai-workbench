@@ -89,9 +89,15 @@ function aclControlSelfTest(paths,toolchain,output,buildId){
   const proofFile=write(path.join(directory,'result.json'),JSON.stringify(proof,null,2)+'\n');
   if(!okay)throw Error('NATIVE_ACL_CONTROL_SELF_TEST_FAILED');return ref(paths.root,proofFile);
 }
+export function portableWorkSelfTestPaths(paths,buildId,id){
+  const uuid='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
+  if(!new RegExp('^'+uuid+'$','u').test(buildId)||!new RegExp('^wce-'+uuid+'$','u').test(id))throw Error('WORK_SELF_TEST_IDENTITY');
+  const execution=path.join(paths.dataRoot,'agent-work-cycle-runner/native-tests',buildId,'executions',id),runtime=path.join(execution,'runtime');
+  const snapshot=path.join(paths.dataRoot,'runtime-self-test',buildId,id);
+  return {execution,runtime,input:path.join(snapshot,'input'),output:path.join(snapshot,'output')};
+}
 async function workSelfTest(paths,components,buildId) {
-  const {root,dataRoot,runtimeRoot}=paths,id='wce-'+crypto.randomUUID(),execution=path.join(dataRoot,'agent-work-cycle-runner/executions',id),runtime=path.join(execution,'runtime');
-  const snapshot=path.join(dataRoot,'runtime-self-test',buildId,id),input=path.join(snapshot,'input'),output=path.join(snapshot,'output');
+  const {root,runtimeRoot}=paths,id='wce-'+crypto.randomUUID(),{execution,runtime,input,output}=portableWorkSelfTestPaths(paths,buildId,id);
   for(const directory of [execution,runtime,input,output])mkdir(directory);
   const marker='AAW_PORTABLE_WORK_SELF_TEST',program=`console.log('${marker}');\n`,scriptSha=hash(program),signature=hash(crypto.randomBytes(32)),nonce=crypto.randomBytes(16).toString('hex');
   write(path.join(input,'test.js'),program);write(path.join(runtime,'program.cjs'),program);

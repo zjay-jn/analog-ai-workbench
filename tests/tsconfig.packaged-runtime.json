@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {"outDir": "../.local/packaged-runtime-test-build"},
+  "include": ["packaged-runtime.test.ts", "packaged-admission.test.ts", "packaged-native-selftests.test.ts", "../tools/packaged-runtime-init.ts", "../apps/desktop/src/renderer/types/global.d.ts"]
+}

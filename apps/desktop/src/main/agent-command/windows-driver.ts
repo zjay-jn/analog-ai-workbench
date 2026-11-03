@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {nativeWindowsEnvironment} from '../native-environment';
+import {runtimePaths} from '../runtime-paths';
 import { isDeepStrictEqual } from 'node:util';
 import { createHash } from 'node:crypto';
 import { COMMAND_LIMITS as L, type CommandEnvironment, type CommandExecution, type CommandStream } from '../../shared/agent/agent-command';
@@ -36,6 +37,7 @@ export function createWindowsCommandDriver(profile:CommandDriverProfile):Command
     try{prepared=prepareWindowsCommand(profile,record,baseline);}catch(error){report('prepare',error,error instanceof CommandPreparationError?commandDiagnosticCauseCode(error.detailCode):undefined);throw error;}
     const {directory,runtimePins,manifest,manifestSha,remaining}=prepared;
     const argv=[directory.root,record.execution.executionId,record.execution.signature,record.intent.nonce,record.execution.environment.revision,record.execution.commandSha256,record.execution.scriptSha256,record.execution.baselineVersion,manifestSha,record.execution.deadlineAt?String(Date.parse(record.execution.deadlineAt)):'',record.execution.cwdRelativePath,...manifest.map(f=>`${f.sha256}:${f.bytes}:${f.relativePath}`)];
+    if (runtimePaths().mode === 'packaged') argv.push('--profile-revision=' + profile.environment.profileRevision);
     // Keep this supervisor outside libuv's kill-on-parent-exit Job so stdin EOF can trigger its own bounded Job cleanup.
     let child:ReturnType<typeof spawn>;
     try{child=spawn(profile.native.path,argv,{cwd:directory.root,shell:false,windowsHide:true,detached:true,stdio:['pipe','pipe','pipe'],env:nativeWindowsEnvironment()});}catch(error){report('spawn',error);throw error;}

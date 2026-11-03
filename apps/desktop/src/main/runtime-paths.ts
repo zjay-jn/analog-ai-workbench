@@ -2,6 +2,7 @@ import path from 'node:path';
 
 /** Main-owned locations. Renderer requests never supply installation or data roots. */
 export type RuntimePaths = Readonly<{
+  mode: 'source' | 'packaged';
   installationRoot: string;
   storageRoot: string;
   dataRoot: string;
@@ -19,10 +20,12 @@ function root(value: string): string {
   return resolved;
 }
 
-export function createRuntimePaths(options: Readonly<{installationRoot: string; storageRoot: string}>): RuntimePaths {
+export function createRuntimePaths(options: Readonly<{installationRoot: string; storageRoot: string; mode?: 'source' | 'packaged'}>): RuntimePaths {
   const installationRoot = root(options.installationRoot), storageRoot = root(options.storageRoot);
+  const mode = options.mode ?? 'source';
+  if (mode !== 'source' && mode !== 'packaged') throw Error('RUNTIME_PATH_CONFIGURATION');
   const dataRoot = path.join(storageRoot, '.local'), runtimeRoot = path.join(installationRoot, '.local', 'runtime');
-  return Object.freeze({installationRoot, storageRoot, dataRoot, profileRoot: path.join(dataRoot, 'cloud-user-data'),
+  return Object.freeze({mode, installationRoot, storageRoot, dataRoot, profileRoot: path.join(dataRoot, 'cloud-user-data'),
     runtimeRoot, nativeRoot: path.join(runtimeRoot, 'native'),
     opencodeExecutable: path.join(runtimeRoot, 'opencode', '1.18.17', 'opencode.exe'),
     pilotRoot: path.join(dataRoot, 'agent-engine-pilot')});
@@ -30,9 +33,9 @@ export function createRuntimePaths(options: Readonly<{installationRoot: string; 
 
 let configured: RuntimePaths | undefined;
 /** Startup sets this once before any capability/store is created; it cannot swap roots later. */
-export function configureRuntimePaths(options: Readonly<{installationRoot: string; storageRoot: string}>): RuntimePaths {
+export function configureRuntimePaths(options: Readonly<{installationRoot: string; storageRoot: string; mode?: 'source' | 'packaged'}>): RuntimePaths {
   const next = createRuntimePaths(options);
-  if (configured && (configured.installationRoot !== next.installationRoot || configured.storageRoot !== next.storageRoot)) throw Error('RUNTIME_PATH_ALREADY_CONFIGURED');
+  if (configured && (configured.mode !== next.mode || configured.installationRoot !== next.installationRoot || configured.storageRoot !== next.storageRoot)) throw Error('RUNTIME_PATH_ALREADY_CONFIGURED');
   return configured ??= next;
 }
 

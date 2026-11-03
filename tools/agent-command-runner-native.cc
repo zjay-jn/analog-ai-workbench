@@ -5,7 +5,10 @@ using namespace aaw;
 namespace {
 constexpr ULONGLONG logLimit=16ULL*1024*1024,maxMs=600000,cleanupMs=10000;
 const std::wstring nodeOptions=L"--preserve-symlinks-main --preserve-symlinks";
-#ifdef AAW_PORTABLE_RUNTIME
+#ifdef AAW_PACKAGED_RUNTIME
+std::wstring shell;
+std::string nativeProfileRevision;
+#elif defined(AAW_PORTABLE_RUNTIME)
 const std::wstring shell=profile::shellPath;
 #else
 const std::wstring shell=L"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
@@ -29,6 +32,11 @@ std::string HashBytes(const unsigned char* data,size_t count){
   }catch(...){if(hash)BCryptDestroyHash(hash);BCryptCloseAlgorithmProvider(algorithm,0);throw;}
 }
 std::string HashText(const std::string& text){return HashBytes(reinterpret_cast<const unsigned char*>(text.data()),text.size());}
+#ifdef AAW_PACKAGED_RUNTIME
+#include "packaged-command-profile.h"
+#else
+const std::string nativeProfileRevision=profile::revision;
+#endif
 void PrivateAcl(const std::wstring& name,bool directory,PSID package=nullptr,bool writable=false){
   Stage("private_acl",name,WRITE_DAC);auto object=Open(name,directory,WRITE_DAC);PSID ownerRights=nullptr;Check(ConvertStringSidToSidW(L"S-1-3-4",&ownerRights),"owner_rights");std::array<EXPLICIT_ACCESSW,3> entries{};
   for(auto& entry:entries){entry.grfAccessMode=GRANT_ACCESS;entry.grfInheritance=directory?SUB_CONTAINERS_AND_OBJECTS_INHERIT:NO_INHERITANCE;entry.Trustee.TrusteeForm=TRUSTEE_IS_SID;}
@@ -112,6 +120,13 @@ void VerifyRuntime(const Arguments& a){const auto runtime=a.root+L"\\runtime";co
 }
 int wmain(int argc,wchar_t** argv){
   Arguments a;PSID sid=nullptr;Handle job,child,thread,outRead,outWrite,errRead,errWrite,inRead,inWrite,driverIntentPin;std::vector<Handle> systemPins;Stream out,err;std::wstring moniker;
+#ifdef AAW_PACKAGED_RUNTIME
+  try{InitializePackagedRuntime(L"command-runner.exe");auto profile=ProbePackagedCommandProfile();
+    if(argc==2&&std::wstring(argv[1])==L"--probe-profile"){std::cout<<"{\"schema\":\"aaw.packaged-native-profile/v1\",\"profileRevision\":\""<<profile.revision<<"\",\"profile\":"<<profile.profile<<"}"<<std::endl;return 0;}
+    Require(argc>=2,"packaged_profile_argument");const std::wstring expected(argv[argc-1]),prefix=L"--profile-revision=";Require(expected.starts_with(prefix)&&IsHex(expected.substr(prefix.size()),64)&&Utf8(expected.substr(prefix.size()))==profile.revision,"packaged_profile_changed");--argc;
+    shell=profile.shell;nativeProfileRevision=profile.revision;systemPins=std::move(profile.systemPins);
+  }catch(const std::exception& error){std::cerr<<"AAW_PACKAGED_PROFILE_ERROR "<<error.what()<<std::endl;return 2;}
+#endif
   bool prepared=false,profileCreated=false,profileDeleted=false,jobClosed=false,emptyConfirmed=false,aclRestored=false,cleanupConfirmed=false,started=false,hasExit=false,baselineUnchanged=false;
   DWORD active=0,exitCode=0,errorCode=0,errorAccess=0;ULONGLONG total=0,sequence=0;std::string startedAt,exitAt,termination="failed_start",stopReason,error,errorStage,errorPath,workManifest="[]",workManifestSha,publicationDetail="null";
   const auto initialTicks=GetTickCount64(),initialUtc=UtcMs();
@@ -122,9 +137,12 @@ int wmain(int argc,wchar_t** argv){
   auto stateJson=[&](const char* schema,bool terminal){return "{\"schema\":"+S(schema)+","+Identity(a)+",\"seq\":"+std::to_string(++sequence)+",\"startedAt\":"+(startedAt.empty()?"null":S(startedAt))+",\"shellExit\":"+((terminal||hasExit)?shellJson():"null")+",\"job\":{\"activeProcesses\":"+std::to_string(active)+",\"emptyConfirmed\":"+B(emptyConfirmed)+",\"observedAt\":"+S(Now())+"},\"logs\":{\"stdout\":"+StreamJson(out,terminal)+",\"stderr\":"+StreamJson(err,terminal)+"},\"stopReason\":"+(stopReason.empty()?"null":S(stopReason));};
   try{
     a=Parse(argc,argv);Stage("lock_execution",a.root);LockAncestors(a.root+L"\\control");LockAncestors(a.root+L"\\runtime");LockAncestors(a.root+L"\\work");Handle own;Check(OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&own.h),"own_token");userInfo=TokenInfo(own.h,TokenUser);
-    PrivateAcl(a.root,true);PrivateAcl(a.root+L"\\control",true);recoveryRoot=a.root+L"\\control";const auto controlFiles=Tree(recoveryRoot);Require(controlFiles.size()==1&&!controlFiles[0].directory&&controlFiles[0].relative==L"intent.json"&&controlFiles[0].bytes<=524288,"control_initial_files");PrivateAcl(recoveryRoot+L"\\intent.json",false);driverIntentPin=Open(recoveryRoot+L"\\intent.json",false,GENERIC_READ,true);const auto intentSha=Hash(driverIntentPin.h,controlFiles[0].bytes);Record(L"native-intent","{\"schema\":\"aaw.command.native.intent.v1\","+Identity(a)+",\"driverIntentSha256\":"+S(intentSha)+",\"absoluteDeadlineUnixMs\":"+std::to_string(a.deadline)+",\"cwdRelativePath\":"+Json(a.cwd)+",\"profileRevision\":"+S(profile::revision)+"}");
+    PrivateAcl(a.root,true);PrivateAcl(a.root+L"\\control",true);recoveryRoot=a.root+L"\\control";const auto controlFiles=Tree(recoveryRoot);Require(controlFiles.size()==1&&!controlFiles[0].directory&&controlFiles[0].relative==L"intent.json"&&controlFiles[0].bytes<=524288,"control_initial_files");PrivateAcl(recoveryRoot+L"\\intent.json",false);driverIntentPin=Open(recoveryRoot+L"\\intent.json",false,GENERIC_READ,true);const auto intentSha=Hash(driverIntentPin.h,controlFiles[0].bytes);Record(L"native-intent","{\"schema\":\"aaw.command.native.intent.v1\","+Identity(a)+",\"driverIntentSha256\":"+S(intentSha)+",\"absoluteDeadlineUnixMs\":"+std::to_string(a.deadline)+",\"cwdRelativePath\":"+Json(a.cwd)+",\"profileRevision\":"+S(nativeProfileRevision)+"}");
     std::array<wchar_t,32768> supervisorPath{};DWORD supervisorSize=static_cast<DWORD>(supervisorPath.size());Check(QueryFullProcessImageNameW(GetCurrentProcess(),0,supervisorPath.data(),&supervisorSize),"supervisor_image");Record(L"supervisor","{\"schema\":\"aaw.command.native.supervisor.v1\","+Identity(a)+",\"pid\":"+std::to_string(GetCurrentProcessId())+",\"creationTime100ns\":"+S(CreationTime(GetCurrentProcess()))+",\"image\":"+Json(std::wstring(supervisorPath.data(),supervisorSize))+"}");
-    out=Log(recoveryRoot+L"\\stdout.bin");err=Log(recoveryRoot+L"\\stderr.bin");for(const auto& pin:profile::systemFiles)systemPins.push_back(PinnedSystem(pin.path,pin.bytes,pin.sha256));
+    out=Log(recoveryRoot+L"\\stdout.bin");err=Log(recoveryRoot+L"\\stderr.bin");
+#ifndef AAW_PACKAGED_RUNTIME
+    for(const auto& pin:profile::systemFiles)systemPins.push_back(PinnedSystem(pin.path,pin.bytes,pin.sha256));
+#endif
     for(const auto& leaf:{L"home",L"temp"})Require(Tree(a.root+L"\\"+leaf).empty(),"scratch_not_empty");VerifyRuntime(a);Require(Manifest(Snapshot(a.root+L"\\baseline"))==Manifest(a.files)&&Manifest(Snapshot(a.root+L"\\work"))==Manifest(a.files),"initial_baseline_work");
     if(!a.cwd.empty()){LockAncestors(a.root+L"\\work\\"+NativeRelative(a.cwd)+L"\\reserved");auto cwd=Open(a.root+L"\\work\\"+NativeRelative(a.cwd),true);ancestry.push_back(std::move(cwd));}prepared=true;
     PWSTR host=nullptr;Check(SHGetKnownFolderPath(FOLDERID_LocalAppData,0,nullptr,&host)==S_OK&&host,"host_localappdata");Check(SetEnvironmentVariableW(L"LOCALAPPDATA",host),"host_localappdata_set");CoTaskMemFree(host);host=nullptr;Check(SHGetKnownFolderPath(FOLDERID_Profile,0,nullptr,&host)==S_OK&&host,"host_profile");Check(SetEnvironmentVariableW(L"USERPROFILE",host),"host_profile_set");CoTaskMemFree(host);

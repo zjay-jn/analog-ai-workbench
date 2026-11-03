@@ -111,6 +111,9 @@ int wmain(int argc,wchar_t** argv){
     return aclRestored&&profileDeleted;
   };
   try{
+#ifdef AAW_PACKAGED_RUNTIME
+    InitializePackagedRuntime(L"work-runner.exe");
+#endif
     request=Parse(argc,argv);LockAncestors(request.execution);LockAncestors(request.runtime);LockAncestors(request.input);LockAncestors(request.output);
     auto exec=Open(request.execution,true);auto output=Open(request.output,true);auto runtime=Open(request.runtime,true);(void)exec;(void)output;(void)runtime;
     recoveryRoot=request.execution;
