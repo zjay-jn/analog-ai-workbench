@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { TaskCapacity, TaskCapacityBytes, TaskCapacityBlock, TaskCapacityEntry } from '../../shared/agent/agent-task-capacity';
@@ -16,7 +17,6 @@ export type TaskCapacityPaths = Readonly<{
   workspaces?: string; commandRecords?: string; workExecutions?: string; commandExecutions?: string;
 }>;
 export type TaskCapacitySnapshot = Readonly<{ entry: TaskCapacityEntry; targets: readonly CapacityTarget[] }>;
-const product = path.resolve('C:/work/analog_ai_workbench');
 const errorCode = (e: unknown): unknown => e && typeof e === 'object' && 'code' in e ? e.code : null;
 const fail = (code: 'STORAGE_FAILED' | 'CONFLICT' | 'CLEANUP_FAILED' | 'UNSUPPORTED_PATH' = 'STORAGE_FAILED'): never => { throw new WorkCycleError(code); };
 const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -24,6 +24,7 @@ const empty = (): TaskCapacityBytes => ({ taskBytes: 0, logBytes: 0, workspaceBy
 const plainId = (value: string): boolean => /^[A-Za-z0-9][A-Za-z0-9_.-]{0,255}$/u.test(value) && value !== '.' && value !== '..';
 
 function targetPath(paths: TaskCapacityPaths, kind: CapacityTargetKind, id: string): string {
+  const product = runtimePaths().storageRoot;
   const root = paths[kind === 'workspace' ? 'workspaces' : kind === 'command_records' ? 'commandRecords' : kind === 'work_execution' ? 'workExecutions' : 'commandExecutions'];
   if (!root || !plainId(id)) return fail('UNSUPPORTED_PATH');
   const base = path.resolve(root), relative = path.relative(product, base).replaceAll('\\', '/');

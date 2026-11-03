@@ -68,12 +68,18 @@ std::wstring Environment(const Request& r,PSID sid){
   const HRESULT result=GetAppContainerFolderPath(sidText,&folder);LocalFree(sidText);
   Require(SUCCEEDED(result)&&folder,"profile_folder");const std::wstring profile(folder);CoTaskMemFree(folder);
   const auto normalized=Lower(profile),suffix=L"\\packages\\aaw.c1.analysis."+r.nonce+L"\\ac";
+#ifdef AAW_PORTABLE_RUNTIME
+  Require(normalized.size()>3&&normalized[1]==L':'&&normalized[2]==L'\\'&&normalized.size()>suffix.size()&&normalized.ends_with(suffix),"profile_identity");
+  const std::wstring systemRoot=portable_runtime::systemRoot;
+#else
   Require(normalized.rfind(L"c:\\",0)==0&&normalized.size()>suffix.size()&&normalized.ends_with(suffix),"profile_identity");
+  const std::wstring systemRoot=L"C:\\Windows";
+#endif
   Record(L"environment","{\"profileFolder\":"+Json(profile)+",\"hostEnvironmentInherited\":false}");
   const std::vector<std::wstring> values{L"AAW_INPUT_DIR="+r.input,L"AAW_OUTPUT_DIR="+r.output,L"APPDATA="+profile,
-    L"ComSpec=C:\\Windows\\System32\\cmd.exe",L"HOMEDRIVE=C:",L"HOMEPATH="+profile.substr(2),L"LOCALAPPDATA="+profile,
-    L"PATH="+r.runtime+L";C:\\Windows\\System32",L"PATHEXT=.COM;.EXE;.BAT;.CMD",L"SystemDrive=C:",L"SystemRoot=C:\\Windows",
-    L"TEMP="+r.output,L"TMP="+r.output,L"USERPROFILE="+profile,L"windir=C:\\Windows"};
+    L"ComSpec="+systemRoot+L"\\System32\\cmd.exe",L"HOMEDRIVE="+profile.substr(0,2),L"HOMEPATH="+profile.substr(2),L"LOCALAPPDATA="+profile,
+    L"PATH="+r.runtime+L";"+systemRoot+L"\\System32",L"PATHEXT=.COM;.EXE;.BAT;.CMD",L"SystemDrive="+systemRoot.substr(0,2),L"SystemRoot="+systemRoot,
+    L"TEMP="+r.output,L"TMP="+r.output,L"USERPROFILE="+profile,L"windir="+systemRoot};
   std::wstring block;for(const auto& item:values){block+=item;block.push_back(0);}block.push_back(0);return block;
 }
 void PrepareHostEnvironment(){

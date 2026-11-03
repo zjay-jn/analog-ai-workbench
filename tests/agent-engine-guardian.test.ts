@@ -4,10 +4,12 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import childProcess from 'node:child_process';
-import { ENGINE_GUARDIAN_IDENTITY, parseGuardianReady, parseGuardianResult, startEngineGuardian, verifyClosedEngineController, type EngineGuardianIdentity } from '../apps/desktop/src/main/engine-pilot/engine-guardian';
+import { parseGuardianReady, parseGuardianResult, startEngineGuardian, verifyClosedEngineController, type EngineGuardianIdentity } from '../apps/desktop/src/main/engine-pilot/engine-guardian';
+import {runtimePaths} from '../apps/desktop/src/main/runtime-paths';
 const files=require('../apps/desktop/src/main/agent-command/native-files') as typeof import('../apps/desktop/src/main/agent-command/native-files');
-const root=path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-pilot/native/12345678-1234-4123-8123-123456789abc'),sha='a'.repeat(64);
-const identity:EngineGuardianIdentity={binary:{path:path.resolve('C:/work/analog_ai_workbench/.local/synthetic/guardian.exe'),bytes:1,sha256:sha},proof:{path:path.resolve('C:/work/analog_ai_workbench/.local/synthetic/proof.json'),bytes:1,sha256:sha},engine:{path:path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-candidate-v1.18.17/opencode.exe'),bytes:1,sha256:sha}};
+const manifest=require('../apps/desktop/src/main/runtime-manifest') as typeof import('../apps/desktop/src/main/runtime-manifest');
+const locations=runtimePaths(),root=path.join(locations.pilotRoot,'native/12345678-1234-4123-8123-123456789abc'),sha='a'.repeat(64);
+const identity:EngineGuardianIdentity={binary:{path:path.join(locations.nativeRoot,'guardian.exe'),bytes:1,sha256:sha},proof:{path:path.join(locations.runtimeRoot,'runtime-manifest.json'),bytes:1,sha256:sha},engine:{path:locations.opencodeExecutable,bytes:1,sha256:sha}};
 const binding={root,port:43124,guardianPid:1234,identity},guardian={pid:1234,creationTime100ns:'134000000000000000',image:identity.binary.path},engine={pid:5678,creationTime100ns:'134000000000000001',image:identity.engine.path,sha256:sha};
 const ready={schema:'aaw.engine.guardian.ready.v1',nonce:path.basename(root),root,port:43124,startedAt:'2026-09-14T00:00:00.000Z',guardian,engine,job:{atomic:true,killOnClose:true,breakawayAllowed:false}};
 const result={schema:'aaw.engine.guardian.result.v1',nonce:path.basename(root),root,port:43124,guardian,engine,engineExited:true,engineExitCode:23,termination:'requested',job:{activeProcesses:0,emptyConfirmed:true,closed:true},cleanupConfirmed:true,error:null};
@@ -36,7 +38,9 @@ test('guardian transport sends one stop on private stdin and never treats child 
 });
 
 test('persisted controller review binds exact startup hashes and guardian creation identity without scanning',t=>{
-  const pinned=ENGINE_GUARDIAN_IDENTITY,owner={...guardian,image:pinned.binary.path},actual={...engine,image:pinned.engine.path,sha256:pinned.engine.sha256};
+  t.mock.method(manifest,'runtimeComponent',(id:string)=>{if(id==='guardian')return identity.binary;if(id==='opencode')return identity.engine;throw Error('unexpected component');});
+  t.mock.method(manifest,'runtimeManifestPin',()=>identity.proof);
+  const pinned=identity,owner={...guardian,image:pinned.binary.path},actual={...engine,image:pinned.engine.path,sha256:pinned.engine.sha256};
   const start={...ready,guardian:owner,engine:actual},intentRecord={...intent,guardian:owner,engineImage:pinned.engine.path,engineSha256:pinned.engine.sha256};
   let end:unknown={...result,guardian:owner,engine:actual};const reads:string[]=[];
   t.mock.method(files,'nativePinned',()=>Buffer.from('mocked fixed native bytes'));

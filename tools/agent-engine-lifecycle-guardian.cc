@@ -2,7 +2,11 @@
 #include <cstdio>
 using namespace aaw;
 namespace {
+#ifdef AAW_PORTABLE_RUNTIME
+const std::wstring engineImage=installationRuntime+L"opencode\\1.18.17\\opencode.exe";
+#else
 const std::wstring engineImage=productLocal+L"agent-engine-candidate-v1.18.17\\opencode.exe";
+#endif
 constexpr char engineSha[]="2d8ed451c4c3e4dd69b9dec026030ec5bd00814b8f2b81483f8d80e35d8dce54";
 constexpr ULONGLONG engineBytes=178721160,cleanupMs=2000;
 std::string stage="arguments";

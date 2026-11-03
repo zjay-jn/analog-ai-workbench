@@ -15,6 +15,10 @@
     "agent-command-empty-delta.test.ts",
     "agent-command-presentation.test.ts",
     "agent-large-output-contract.test.ts",
+    "portable-runtime-paths.test.ts",
+    "portable-runtime-manifest.test.ts",
+    "portable-reviewed-source.test.ts",
+    "agent-engine-guardian.test.ts",
     "../apps/desktop/src/renderer/types/global.d.ts"
   ]
 }

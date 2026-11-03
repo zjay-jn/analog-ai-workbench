@@ -10,6 +10,7 @@ The repository's `.gitattributes` disables Git line-ending conversion. Fixture a
 npm run typecheck
 npm run test:public
 npm run test:release
+npm run test:setup
 npm run test:security
 npm run licenses:check
 npm run release:audit
@@ -20,16 +21,15 @@ npm run check:public-source
 
 `npm test` retains the development workspace's broader tests. Some currently require private reviewed fixtures or pinned native integration resources and are not the public CI entry point. `.integration.mjs`, native helper, real provider and WSL/EDA checks need their own explicit environment; do not silently substitute public synthetic results for those checks.
 
-## Desktop runtime migration still required
+## Desktop runtime
 
-The source preview is not yet a portable desktop release. In particular:
+Follow [INSTALLATION](INSTALLATION.md) for the locked Windows source installation. `npm run setup:desktop` prepares the fixed OpenCode/Electron SDKs, builds native helpers with Python/VS C++/Windows SDK, exercises native isolation and cleanup, and only then admits command execution. `npm start` builds and launches the production cloud entry.
 
-- Cloud bootstrap and several stores/clients validate a fixed development root. Replace this consistently with an installation/data-root policy while preserving path and identity checks.
-- The supervisor expects OpenCode `v1.18.17` plus a guardian binary and a historical build receipt. Native command/file helpers also require a reproducible installation/build path. Do not copy someone's entire `.local` as setup.
-- The real reviewed example and OA adapter rely on a private saved circuit, fixed source hashes and a personal WSL configuration. A general configurable adapter and freely redistributable sample are needed.
-- Electron's binary is not downloaded by `npm ci` because scripts are disabled. When explicitly preparing a desktop environment, `node node_modules/electron/install.js` runs the locked Electron install step. This downloads Electron but does not solve the root, engine or helper requirements above.
+Installation assets live below the checkout's `.local/runtime`; mutable stores and the Chromium profile default to `%APPDATA%/AnalogAIWorkbench/.local`. Main configures these roots before capabilities are constructed. Explicit `--storage-root=<absolute>` must match between setup and startup. Paths, links, file identities, hashes, generated root bindings and native results remain checked. Relocating installed native files requires rerunning setup rather than copying an old manifest.
 
-Do not claim `npm run start:cloud` works on a clean clone until these points and a clean-machine startup have passed. Do not change a single hardcoded path and remove the remaining checks to bypass setup.
+Production starts without legacy credential-file loading or a private OA source. Configure model keys in the existing settings UI. The synthetic schematic works without credentials, WSL or Cadence. Real OA/WSL integration is optional work that requires an explicitly configured environment; the earlier private example is not a default installed asset.
+
+The installation does not provide a binary release or automatically migrate another installation's conversations/keys. Some full historical tests still require their original integrations. Native command verification uses fixed synthetic commands, never project instructions. Diagnostic `doctor` is read-only and must not trigger an Electron download.
 
 ## Release preparation tools
 

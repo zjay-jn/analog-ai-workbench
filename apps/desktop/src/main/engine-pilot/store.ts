@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { parsePilotDisk, PILOT_LIMITS, type PilotDisk } from '../../shared/agent/engine-pilot';
+import {runtimePaths} from '../runtime-paths';
 
 export class PilotStorageError extends Error { constructor() { super('Pilot storage unavailable'); } }
 export interface PilotStore { load(): PilotDisk; save(value: PilotDisk): void; close(): void; }
@@ -9,7 +10,7 @@ const digest = (value: Buffer | null): string | null => value === null ? null : 
 /** Only product-owned pilot state or explicitly isolated synthetic test state. */
 export function createPilotStore(root: string, directory = path.join(root,'.local','agent-engine-pilot')): PilotStore {
   const base = path.resolve(root), folder = path.resolve(directory);
-  if (base.toLowerCase() !== path.resolve('C:/work/analog_ai_workbench').toLowerCase()) throw new PilotStorageError();
+  if (base.toLowerCase() !== runtimePaths().storageRoot.toLowerCase()) throw new PilotStorageError();
   const relative = path.relative(base,folder).replaceAll('\\','/');
   if (relative !== '.local/agent-engine-pilot' && relative !== '.local/agent-engine-live' && !/^\.local\/agent-engine-pilot-tests\/[0-9a-f-]{36}$/u.test(relative) && !/^\.local\/agent-engine-live-tests\/[0-9a-f-]{36}\/agent-engine-live$/u.test(relative)) throw new PilotStorageError();
   const target = path.join(folder,'runs.json'), lock = path.join(folder,'writer.lock'), nonce = randomUUID();

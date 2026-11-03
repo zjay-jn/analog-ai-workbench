@@ -19,6 +19,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef AAW_PORTABLE_RUNTIME
+#include "runtime-paths.h"
+#endif
 
 namespace aaw {
 struct Handle {
@@ -33,7 +36,12 @@ struct Handle {
 };
 void Check(bool okay,const char* stage){if(!okay)throw std::runtime_error(std::string(stage)+":"+std::to_string(GetLastError()));}
 void Require(bool okay,const char* stage){if(!okay)throw std::runtime_error(stage);}
+#ifdef AAW_PORTABLE_RUNTIME
+const std::wstring productLocal=portable_runtime::dataLocal;
+const std::wstring installationRuntime=portable_runtime::installationRuntime;
+#else
 const std::wstring productLocal=L"C:\\work\\analog_ai_workbench\\.local\\";
+#endif
 std::wstring recoveryRoot;
 std::vector<Handle> ancestry;
 std::wstring Lower(std::wstring value){std::transform(value.begin(),value.end(),value.begin(),[](wchar_t ch){return static_cast<wchar_t>(towlower(ch));});return value;}
@@ -64,7 +72,11 @@ bool Relative(const std::wstring& value){
 std::wstring NativeRelative(std::wstring value){std::replace(value.begin(),value.end(),L'/',L'\\');return value;}
 // Only the Win32 API spelling changes; authorization and handle identity use the original DOS path.
 std::wstring Win32Path(const std::wstring& name){
+#ifdef AAW_PORTABLE_RUNTIME
+  Require(name.size()>3&&name.size()<=32762&&((name[0]>=L'A'&&name[0]<=L'Z')||(name[0]>=L'a'&&name[0]<=L'z'))&&name[1]==L':'&&name[2]==L'\\',"canonical_dos_path");
+#else
   Require(name.size()>3&&name.size()<=32762&&(name[0]==L'C'||name[0]==L'c')&&name[1]==L':'&&name[2]==L'\\',"canonical_dos_path");
+#endif
   size_t start=3;
   for(size_t end=3;end<=name.size();++end){
     if(end<name.size()&&name[end]!=L'\\')continue;
@@ -78,7 +90,11 @@ std::wstring FinalPath(HANDLE handle){
   Check(n>0&&n<buffer.size(),"final_path");std::wstring value(buffer.data(),n);if(value.rfind(L"\\\\?\\",0)==0)value=value.substr(4);return value;
 }
 Handle Open(const std::wstring& name,bool directory,DWORD extra=0,bool immutable=false){
+#ifdef AAW_PORTABLE_RUNTIME
+  Require(Within(name,productLocal)||Within(name,installationRuntime),"outside_product_local");
+#else
   Require(Within(name,productLocal),"outside_product_local");
+#endif
   Handle file(CreateFileW(Win32Path(name).c_str(),READ_CONTROL|FILE_READ_ATTRIBUTES|extra,immutable?FILE_SHARE_READ:FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_BACKUP_SEMANTICS,nullptr));
   Check(file.h!=INVALID_HANDLE_VALUE,"open_object");FILE_ATTRIBUTE_TAG_INFO tag{};FILE_STANDARD_INFO standard{};
   Check(GetFileInformationByHandleEx(file.h,FileAttributeTagInfo,&tag,sizeof(tag))&&GetFileInformationByHandleEx(file.h,FileStandardInfo,&standard,sizeof(standard)),"object_metadata");
@@ -86,8 +102,16 @@ Handle Open(const std::wstring& name,bool directory,DWORD extra=0,bool immutable
   Require(Lower(FinalPath(file.h))==Lower(name),"object_alias");return file;
 }
 void LockAncestors(const std::wstring& name){
+#ifdef AAW_PORTABLE_RUNTIME
+  Require((Within(name,productLocal)||Within(name,installationRuntime))&&name.size()<1024,"absolute_path");
+#else
   Require(Within(name,productLocal)&&name.size()<1024,"absolute_path");
+#endif
+#ifdef AAW_PORTABLE_RUNTIME
+  Require(GetDriveTypeW(name.substr(0,3).c_str())==DRIVE_FIXED,"fixed_drive");
+#else
   Require(GetDriveTypeW(L"C:\\")==DRIVE_FIXED,"fixed_drive");
+#endif
   for(size_t pos=3;pos<name.size();++pos){if(name[pos]!=L'\\')continue;const auto part=name.substr(0,pos);
     Handle h(CreateFileW(Win32Path(part).c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr));
     Check(h.h!=INVALID_HANDLE_VALUE,"ancestor");FILE_ATTRIBUTE_TAG_INFO info{};

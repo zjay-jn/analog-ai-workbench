@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import {nativeWindowsEnvironment} from '../native-environment';
 import { isDeepStrictEqual } from 'node:util';
 import { createHash } from 'node:crypto';
 import { COMMAND_LIMITS as L, type CommandEnvironment, type CommandExecution, type CommandStream } from '../../shared/agent/agent-command';
@@ -12,7 +13,7 @@ import { CommandError, CommandPreparationError, type CommandDriver, type Command
 import { commandChangesVersion, validateCommandChanges } from './changes';
 import { prepareWindowsCommand } from './windows-preparation';
 import { recoverWindowsCommand } from './windows-recovery';
-import { COMMAND_PRODUCT, createNativeLogReader, nativeDigest, nativePinned, nativeRead, nativeReadStatus, prepareNativeDirectory, type NativeFilePin } from './native-files';
+import { commandProduct, createNativeLogReader, nativeDigest, nativePinned, nativeRead, nativeReadStatus, prepareNativeDirectory, type NativeFilePin } from './native-files';
 import { nativeManifest, nativeManifestSha, parseNativeReady, parseNativeResult, parseNativeStatus, type NativeCommandResult, type NativeCommandStatus, type NativeManifestEntry } from './native-protocol';
 
 export type CommandDriverProfile=Readonly<{
@@ -37,7 +38,7 @@ export function createWindowsCommandDriver(profile:CommandDriverProfile):Command
     const argv=[directory.root,record.execution.executionId,record.execution.signature,record.intent.nonce,record.execution.environment.revision,record.execution.commandSha256,record.execution.scriptSha256,record.execution.baselineVersion,manifestSha,record.execution.deadlineAt?String(Date.parse(record.execution.deadlineAt)):'',record.execution.cwdRelativePath,...manifest.map(f=>`${f.sha256}:${f.bytes}:${f.relativePath}`)];
     // Keep this supervisor outside libuv's kill-on-parent-exit Job so stdin EOF can trigger its own bounded Job cleanup.
     let child:ReturnType<typeof spawn>;
-    try{child=spawn(profile.native.path,argv,{cwd:directory.root,shell:false,windowsHide:true,detached:true,stdio:['pipe','pipe','pipe'],env:{SystemRoot:'C:\\Windows',windir:'C:\\Windows',SystemDrive:'C:'}});}catch(error){report('spawn',error);throw error;}
+    try{child=spawn(profile.native.path,argv,{cwd:directory.root,shell:false,windowsHide:true,detached:true,stdio:['pipe','pipe','pipe'],env:nativeWindowsEnvironment()});}catch(error){report('spawn',error);throw error;}
     let exited=false,exitCode:number|null=null,controlStopped=false,callbackFailed=false,evidenceFailed=false,nativeBytes=0,diagnosticBytes=0,diagnosticTruncated=false;
     const diagnostics:Buffer[]=[];let closeResolve!:()=>void;const closed=new Promise<void>(resolve=>{closeResolve=resolve;});
     // Ownership is installed before any main callback. Failure never loses stdin or the done promise.

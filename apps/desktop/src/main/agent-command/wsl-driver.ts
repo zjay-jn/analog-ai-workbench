@@ -7,7 +7,7 @@ import type {CommandDiagnosticOperation,CommandDiagnosticCauseCode} from '../../
 import { commandObject, commandProcessCount, isCommandEnvironment, isCommandRuntime } from '../../shared/agent/agent-command-validation';
 import { WORK_CYCLE_LIMITS as W } from '../../shared/agent/agent-work-cycle';
 import type { WorkCycleBaseline } from '../agent-work-cycle/types';
-import { COMMAND_EXECUTIONS, nativePinned, nativeRead, prepareNativeDirectory, type NativeFilePin } from './native-files';
+import { commandExecutions, nativePinned, nativeRead, prepareNativeDirectory, type NativeFilePin } from './native-files';
 import { CommandError, type CommandDriver, type CommandDriverOutcome, type CommandRecord } from './types';
 import { decodeWslBytes, parseWslTerminal, wslChanges, wslDigest, wslIdentity, wslIdentityMatches, type WslTerminal } from './wsl-protocol';
 import {readWslPrestartRecovery,type WslPrestartRecoveryPin} from './wsl-prestart-recovery';
@@ -27,7 +27,7 @@ export function createWslRequest(profile:WslCommandDriverProfile,record:CommandR
   if(mode==='run'&&files.length!==record.intent.baseline.length)throw new CommandError('SOURCE_CHANGED');
   const wsl=profile.environment.wsl;
   const python=profile.environment.tools.find(t=>t.name==='python3'),bubblewrap=profile.environment.tools.find(t=>t.name==='bubblewrap');if(!python||!bubblewrap)throw new CommandError('CAPABILITY_DENIED');
-  return {schema:'aaw.command.wsl.request.v1',mode,identity:wslIdentity(record),distribution:wsl.distribution,user:wsl.user,executionRoot:wsl.executionRoot,hostControl:wslWindowsPath(path.join(COMMAND_EXECUTIONS,record.execution.executionId,'control')),shellPath:wsl.shellPath,bubblewrapPath:profile.bubblewrapPath,runtimeSha256:{bash:profile.environment.shell.sha256,python:python.sha256,bubblewrap:bubblewrap.sha256},sourceRoots:wsl.sourceRoots,cwdRelativePath:record.execution.cwdRelativePath,commandText:record.execution.commandText,timeoutMs:Math.max(1,Math.min(record.intent.args.timeoutMs,Date.parse(record.execution.deadlineAt)-Date.now())),logBytes:profile.environment.limits.logBytes,processLimit:profile.environment.limits.processes,baseline:files};
+  return {schema:'aaw.command.wsl.request.v1',mode,identity:wslIdentity(record),distribution:wsl.distribution,user:wsl.user,executionRoot:wsl.executionRoot,hostControl:wslWindowsPath(path.join(commandExecutions(),record.execution.executionId,'control')),shellPath:wsl.shellPath,bubblewrapPath:profile.bubblewrapPath,runtimeSha256:{bash:profile.environment.shell.sha256,python:python.sha256,bubblewrap:bubblewrap.sha256},sourceRoots:wsl.sourceRoots,cwdRelativePath:record.execution.cwdRelativePath,commandText:record.execution.commandText,timeoutMs:Math.max(1,Math.min(record.intent.args.timeoutMs,Date.parse(record.execution.deadlineAt)-Date.now())),logBytes:profile.environment.limits.logBytes,processLimit:profile.environment.limits.processes,baseline:files};
 }
 /** A live count is an observation, but legacy environments still bind its range. */
 export function parseWslJob(value:unknown,record:CommandRecord,started:boolean):CommandRecord['execution']['job']{
@@ -54,7 +54,7 @@ export function createWslRecoveryDriver(environment:WslCommandEnvironment,presta
   const admitted=structuredClone(environment);
   return {environment:admitted,recoveryOnly:true,async start(){throw new CommandError('CAPABILITY_DENIED');},async recover(record){
     if(!/^cmd-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(record.execution.executionId)||!isDeepStrictEqual(record.intent.environment,admitted))return null;
-    const read=(name:string,max:number)=>nativeRead(path.join(COMMAND_EXECUTIONS,record.execution.executionId,'control',name),max);
+    const read=(name:string,max:number)=>nativeRead(path.join(commandExecutions(),record.execution.executionId,'control',name),max);
     return readWslCommandRecovery(record,read)??readWslPrestartRecovery(record,read,prestartRecovery);
   }};
 }
@@ -160,7 +160,7 @@ export function createWslCommandDriver(profile:WslCommandDriverProfile):CommandD
   }
   return {environment:structuredClone(profile.environment),async start(record,baseline,callbacks){const handle=bridge(record,'run',baseline,callbacks);return {stop:handle.stop,done:handle.done.then(r=>r.outcome)};},async recover(record){
     if(!/^cmd-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(record.execution.executionId)||!isDeepStrictEqual(record.intent.environment,profile.environment))return null;
-    const read=(name:string,max:number)=>nativeRead(path.join(COMMAND_EXECUTIONS,record.execution.executionId,'control',name),max);
+    const read=(name:string,max:number)=>nativeRead(path.join(commandExecutions(),record.execution.executionId,'control',name),max);
     return readWslCommandRecovery(record,read)??readWslPrestartRecovery(record,read,profile.prestartRecovery??[]);
   }};
 }

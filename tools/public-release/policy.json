@@ -5,7 +5,7 @@
   "additionalFiles": [".github/workflows/public-source.yml"],
   "extensions": [".ts", ".tsx", ".mts", ".mjs", ".cjs", ".js", ".json", ".md", ".css", ".html", ".cc", ".c", ".cpp", ".h", ".gyp", ".py", ".ps1", ".cmd", ".il", ".sse", ".gitkeep", ".yml"],
   "publicRootDocuments": ["README.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md"],
-  "publicAdditionalDocuments": ["ARCHITECTURE.md", "DEVELOPMENT.md", "ROADMAP.md", "RELEASE_CHECKLIST.md", "DEPENDENCY_LICENSES.json", "SOURCE_PERMISSIONS.md"],
+  "publicAdditionalDocuments": ["ARCHITECTURE.md", "DEVELOPMENT.md", "ROADMAP.md", "RELEASE_CHECKLIST.md", "DEPENDENCY_LICENSES.json", "SOURCE_PERMISSIONS.md", "INSTALLATION.md"],
   "deniedSegments": [".git", ".local", ".agents", ".codex", "node_modules", ".pnpm-store", "dist", "build", "out", "release", ".vite", ".webpack", "coverage", "target", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".venv", "venv", "local-data", "workspace-state", "artifacts", "exports", "staging", "logs", "models", "weights", "checkpoints", "vector-indexes", "psf", "netlist", "secrets"],
   "deniedExtensions": [".log", ".exe", ".dll", ".node", ".zip", ".7z", ".tar", ".gz", ".bin", ".safetensors", ".ckpt", ".sqlite", ".sqlite3", ".db", ".oa", ".pem", ".key", ".pfx", ".p12", ".jks"],
   "maxFileBytes": 2097152,

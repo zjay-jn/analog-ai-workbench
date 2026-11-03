@@ -2,14 +2,17 @@ import childProcess, { type ChildProcessWithoutNullStreams, type SpawnOptionsWit
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
+import {runtimeComponent} from '../runtime-manifest';
+import {nativeWindowsEnvironment} from '../native-environment';
 import { WORK_CYCLE_LIMITS as L, isWorkCycleRelativePath } from '../../shared/agent/agent-work-cycle';
 import { PROJECT_READ_LIMITS as P } from '../../shared/agent/agent-project-read';
 import { fileNameAllowed } from '../../shared/agent/file-context';
 import { folderPartAllowed } from '../cloud/project-folder-files';
 import { WorkCycleError, type WorkCycleRunner, type WorkCycleRunnerResult, type WorkCycleSnapshot } from './types';
 
-const PRODUCT = path.resolve('C:/work/analog_ai_workbench');
-const ROOT = path.join(PRODUCT, '.local', 'agent-work-cycle-runner');
+const product = () => runtimePaths().storageRoot;
+const runnerRoot = () => path.join(runtimePaths().dataRoot, 'agent-work-cycle-runner');
 const hashPattern = /^[0-9a-f]{64}$/u;
 const executionPattern = /^wce-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const MAX_RECEIPTS = P.runs * L.executions;
@@ -17,12 +20,19 @@ const WIRE_BYTES = 16384;
 /** Pins remain unavailable until root admits both the native binary and actual isolation proof. */
 export const WORK_CYCLE_RUNNER_IDENTITY = Object.freeze({
   version: 'aaw.c1.windows-runner.v1',
-  runtime: path.join(PRODUCT, '.local', 'toolchains', 'node-v24.20.0-win-x64', 'node.exe'),
+  get runtime() {return path.join(runtimePaths().runtimeRoot, 'node', 'node.exe');},
   runtimeBytes: 93381448, runtimeSha256: '5c976096e04e5c2c1f091938926234cc9fbebfe9787ddd149351b3b0ecc707b5',
   licenseSha256: 'ed34dd8e3f0a78dbaf00d0444ce8e285b015b765379c2e17880455f70370f8e9',
-  native: path.join(PRODUCT, '.local', 'quality-evidence', '20260913-agent-work-continuation-native-01', 'build', 'runner.exe'), nativeSha256: 'a83450d7221222fe08d3be0d1893edb94019e32642b8084d2d1495f4c98041cb' as string | null,
-  proof: path.join(PRODUCT, '.local', 'quality-evidence', '20260913-agent-work-continuation-native-01', 'test-02', 'result.json'), proofSha256: '6ecdc5cc2f1bba0113fc4af7a948d93072beef12aaaae23f997dec45278abb6e' as string | null,
+  get native() {return path.join(runtimePaths().nativeRoot, 'work-runner.exe');}, nativeSha256: null as string | null,
+  get proof() {return path.join(runtimePaths().runtimeRoot, 'work-proof.json');}, proofSha256: null as string | null,
 });
+function installedIdentity(): Identity {
+  try {
+    const runtime=runtimeComponent('node'),license=runtimeComponent('nodeLicense'),native=runtimeComponent('workRunner'),proof=runtimeComponent('workProof');
+    return Object.freeze({version:WORK_CYCLE_RUNNER_IDENTITY.version,runtime:runtime.path,runtimeBytes:runtime.bytes,runtimeSha256:runtime.sha256,
+      licenseSha256:license.sha256,native:native.path,nativeSha256:native.sha256,proof:proof.path,proofSha256:proof.sha256});
+  } catch {return {...WORK_CYCLE_RUNNER_IDENTITY};}
+}
 type Identity = Readonly<{ version: string; runtime: string; runtimeBytes: number; runtimeSha256: string; licenseSha256: string; native: string; nativeSha256: string | null; proof: string; proofSha256: string | null }>;
 type NativeSpawn = (program: string, args: string[], options: SpawnOptionsWithoutStdio) => ChildProcessWithoutNullStreams;
 type Removal = Readonly<{ unlink(filename: string): void; rmdir(directory: string): void; exists(filename: string): boolean; entries(directory: string): string[] }>;
@@ -43,7 +53,7 @@ const sameStamp = (a: Stamp, b: Stamp): boolean => a.dev === b.dev && a.ino === 
 const stable = (a: fs.BigIntStats, b: fs.BigIntStats): boolean => sameStamp(stamp(a), stamp(b)) && a.size === b.size && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs;
 function ordinary(filename: string, directory: boolean): fs.BigIntStats {
   const absolute = path.resolve(filename);
-  if (!absolute.toLowerCase().startsWith(PRODUCT.toLowerCase() + path.sep)) fail('UNSUPPORTED_PATH');
+  if (![product(),runtimePaths().installationRoot].some(root=>absolute.toLowerCase().startsWith(root.toLowerCase()+path.sep))) fail('UNSUPPORTED_PATH');
   const chain: string[] = []; let cursor = absolute;
   while (path.dirname(cursor) !== cursor) { chain.unshift(cursor); cursor = path.dirname(cursor); }
   let final: fs.BigIntStats | undefined;
@@ -115,7 +125,7 @@ function snapshotIdentity(snapshot: WorkCycleSnapshot): string {
   if (!executionPattern.test(snapshot.executionId) || !workPath(snapshot.scriptRelativePath) || !snapshot.scriptRelativePath.endsWith('.js') || !opaque(snapshot.script.fileId) || !hashPattern.test(snapshot.script.version) || !Array.isArray(snapshot.inputs) || snapshot.inputs.length < 1 || snapshot.inputs.length > L.files) fail('INVALID_REQUEST');
   if (typeof snapshot.inputDirectory !== 'string' || typeof snapshot.outputDirectory !== 'string') fail('INVALID_REQUEST');
   const input = path.resolve(snapshot.inputDirectory), output = path.resolve(snapshot.outputDirectory);
-  if (input !== snapshot.inputDirectory || output !== snapshot.outputDirectory || !input.toLowerCase().startsWith(path.join(PRODUCT, '.local').toLowerCase() + path.sep) || path.basename(input) !== 'input' || path.basename(output) !== 'output' || !samePath(path.dirname(input), path.dirname(output)) || path.basename(path.dirname(input)) !== snapshot.executionId) fail('UNSUPPORTED_PATH');
+  if (input !== snapshot.inputDirectory || output !== snapshot.outputDirectory || !input.toLowerCase().startsWith(path.join(product(), '.local').toLowerCase() + path.sep) || path.basename(input) !== 'input' || path.basename(output) !== 'output' || !samePath(path.dirname(input), path.dirname(output)) || path.basename(path.dirname(input)) !== snapshot.executionId) fail('UNSUPPORTED_PATH');
   ordinary(input, true); ordinary(output, true); const names = new Set<string>(), ids = new Set<string>(); let total = 0;
   for (const item of snapshot.inputs) {
     exact(item, ['fileId', 'relativePath', 'version', 'bytes']);
@@ -215,7 +225,7 @@ function createRunner(host: Host): WorkCycleRunner {
               if (!pinned(host.identity)) fail('ENGINE_FAILED');
               const args = [execution, runtime, snapshot.inputDirectory, snapshot.outputDirectory, snapshot.executionId, signature, nonce, snapshot.scriptRelativePath, snapshot.script.version, ...snapshot.inputs.map(item => item.version + ':' + item.bytes + ':' + item.relativePath)];
               if (args.join(' ').length > 24000) fail('BUDGET_EXCEEDED');
-              const child = host.spawn(host.identity.native, args, { cwd: execution, shell: false, windowsHide: true, env: { SystemRoot: 'C:\\Windows', windir: 'C:\\Windows', SystemDrive: 'C:' } }); processMayHaveStarted = child.pid !== undefined;
+              const child = host.spawn(host.identity.native, args, { cwd: execution, shell: false, windowsHide: true, env: nativeWindowsEnvironment() }); processMayHaveStarted = child.pid !== undefined;
               const received = await new Promise<{ code: number | null; stdout: Buffer; cleanClose: boolean; malformed: boolean; timedOut: boolean }>(resolve => {
                 const chunks: Buffer[] = []; let length = 0, errors = 0, malformed = false, timedOut = false, settled = false, killTimer: ReturnType<typeof setTimeout> | undefined;
                 const finish = (code: number | null, cleanClose: boolean) => { if (settled) return; settled = true; clearTimeout(watchdog); if (killTimer) clearTimeout(killTimer); abort.signal.removeEventListener('abort', stop); resolve({ code, stdout: Buffer.concat(chunks), cleanClose, malformed, timedOut }); };
@@ -253,14 +263,14 @@ function createRunner(host: Host): WorkCycleRunner {
 }
 const realRemoval: Removal = { unlink: filename => fs.unlinkSync(filename), rmdir: directory => fs.rmdirSync(directory), exists: filename => fs.existsSync(filename), entries: directory => fs.readdirSync(directory) };
 export function createWindowsWorkCycleRunner(): WorkCycleRunner {
-  return createRunner({ identity: WORK_CYCLE_RUNNER_IDENTITY, executions: path.join(ROOT, 'executions'), spawn: (program, args, options) => childProcess.spawn(program, args, { ...options, stdio: ['pipe', 'pipe', 'pipe'] }), removal: realRemoval });
+  return createRunner({ identity: installedIdentity(), executions: path.join(runnerRoot(), 'executions'), spawn: (program, args, options) => childProcess.spawn(program, args, { ...options, stdio: ['pipe', 'pipe', 'pipe'] }), removal: realRemoval });
 }
 export const createWorkCycleRunner = createWindowsWorkCycleRunner;
 /** Explicit in-process test dependency seam; never used by bootstrap, IPC or a model.
  * Tests must supply a process stub and removal counters, and can only use a fresh private test root. */
 export function createWorkCycleRunnerForTests(options: Readonly<{ directory: string; identity: Identity; spawn: NativeSpawn; removal: Removal; beforePrepare?: () => Promise<void>; beforeResult?: () => Promise<void> }>): WorkCycleRunner {
   const directory = path.resolve(options.directory);
-  if (directory !== options.directory || !/[/\\]\.local[/\\]agent-work-cycle-runner-tests[/\\][0-9a-f-]{36}$/u.test(directory) || !directory.toLowerCase().startsWith(PRODUCT.toLowerCase() + path.sep)) fail('UNSUPPORTED_PATH');
+  if (directory !== options.directory || !/[/\\]\.local[/\\]agent-work-cycle-runner-tests[/\\][0-9a-f-]{36}$/u.test(directory) || !directory.toLowerCase().startsWith(product().toLowerCase() + path.sep)) fail('UNSUPPORTED_PATH');
   ordinary(directory, true);
   for (const candidate of [options.identity.runtime, options.identity.native, options.identity.proof]) if (!path.resolve(candidate).toLowerCase().startsWith(directory.toLowerCase() + path.sep)) fail('UNSUPPORTED_PATH');
   return createRunner({ ...options, executions: path.join(directory, 'executions') });

@@ -85,6 +85,7 @@ export function CloudDocumentWorkspace({projectId, sessionId = '', canAttachSche
   const openReviewed = () => {controller.current?.selectText(); void reviewedController.current?.open();};
   const selectReviewed = () => {controller.current?.selectText(); reviewedController.current?.select();};
   const activeReviewed = !!realTab?.active, activeSynthetic = !!tab?.active && !activeReviewed;
+  const reviewedDescriptor = reviewed.catalogStatus === 'ready' ? reviewed.descriptors[0] : undefined;
   const realName = realTab?.status === 'ready' ? realTab.delivery.display.source.cell : reviewed.descriptors[0]?.displayName ?? 'FOLDED_CASCODE';
   const preview = reviewed.preview;
   const confirm = () => {
@@ -101,8 +102,8 @@ export function CloudDocumentWorkspace({projectId, sessionId = '', canAttachSche
       onClose: () => activeReviewed ? reviewedController.current?.close() : controller.current?.close(), onSelectText: selectText,
       tabs: [...(tab ? [{key: 'synthetic', title: '合成原理图', active: activeSynthetic, onSelect: selectSynthetic, onClose: () => controller.current?.close()}] : []),
         ...(realTab ? [{key: 'reviewed', title: realName, active: activeReviewed, onSelect: selectReviewed, onClose: () => reviewedController.current?.close()}] : [])],
-      openOptions: [...(reviewedApi ? [{label: `打开 ${reviewed.descriptors[0]?.displayName ?? 'FOLDED_CASCODE'}`, disabled: !!props.disabled, action: openReviewed}] : []),
-        ...(reviewedApi && onAskSchematic ? [{label: '查询 FOLDED_CASCODE 本地副本', disabled: !canAttachSchematic || !sessionId, action: onAskSchematic}] : []),
+      openOptions: [...(reviewedApi && reviewedDescriptor ? [{label: `打开 ${reviewedDescriptor.displayName}`, disabled: !!props.disabled, action: openReviewed}] : []),
+        ...(reviewedApi && reviewedDescriptor && onAskSchematic ? [{label: `查询 ${reviewedDescriptor.displayName} 本地副本`, disabled: !canAttachSchematic || !sessionId, action: onAskSchematic}] : []),
         {label: '打开合成原理图', disabled: !!props.disabled, action: openSynthetic}],
       notice: reviewed.notice ? <div className="schematic-notice" role="alert"><span>{reviewed.notice}</span><button type="button" aria-label="关闭原理图提示" onClick={() => reviewedController.current?.clearNotice()}>×</button></div> : null,
       content: activeReviewed && realTab ? <section className="cloud-schematic-panel" aria-label="已导出原理图工作区" data-schematic-kind="reviewed" data-project-id={projectId} data-status={realTab.status} data-document-key={realTab.key}>

@@ -1,17 +1,24 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
+import {runtimeComponent, runtimeManifestPin} from '../runtime-manifest';
 import { isDeepStrictEqual } from 'node:util';
 import { inspectNativePath, nativePinned, nativeRead, nativeDigest, type NativeFilePin } from '../agent-command/native-files';
 import type { WorkCycleControllerRef, WorkCycleRecovery } from '../../shared/agent/agent-work-cycle';
 import { sameProjectFolderChain } from '../cloud/project-folder-files';
 
 export type EngineGuardianIdentity=Readonly<{binary:NativeFilePin;proof:NativeFilePin;engine:NativeFilePin}>;
-// Fixed candidate bytes; independent static review is complete. Root owns E1/E2/E3 and final promotion.
+// Local setup verifies source/build provenance. The component loader also binds
+// installation and data roots; no discovered binary or historical proof is used.
 export const ENGINE_GUARDIAN_IDENTITY:EngineGuardianIdentity=Object.freeze({
-  binary:{path:path.resolve('C:/work/analog_ai_workbench/.local/quality-evidence/20260914-agent-engine-lifecycle-01/build-02/agent-engine-lifecycle-guardian.exe'),bytes:386048,sha256:'4559c0f20a670748768767103ef993aefb77fed7c99ade8e18dbf9dc75c20d8f'},
-  proof:{path:path.resolve('C:/work/analog_ai_workbench/.local/quality-evidence/20260914-agent-engine-lifecycle-01/build-02/build-proof.json'),bytes:4516,sha256:'db52ffea438b0d7234e7e0da10feeb41e9d7650b8c63e132a72f4b18c3d643d7'},
-  engine:{path:path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-candidate-v1.18.17/opencode.exe'),bytes:178721160,sha256:'2d8ed451c4c3e4dd69b9dec026030ec5bd00814b8f2b81483f8d80e35d8dce54'},
+  get binary() { return runtimeComponent('guardian'); },
+  get proof() { return runtimeManifestPin(); },
+  get engine() { return runtimeComponent('opencode'); },
 });
+/** Capture verified pins once per lifecycle; record polling must not rehash the engine. */
+export function engineGuardianIdentity(): EngineGuardianIdentity {
+  return Object.freeze({binary: runtimeComponent('guardian'), proof: runtimeManifestPin(), engine: runtimeComponent('opencode')});
+}
 type ProcessIdentity=Readonly<{pid:number;creationTime100ns:string;image:string}>;
 export type EngineIdentity=ProcessIdentity&Readonly<{sha256:string}>;
 export type GuardianExit=Readonly<{exited:boolean;code:number|null;signal:string|null}>;
@@ -42,8 +49,8 @@ function controllerRecords(b:Binding){
 /** Exact persisted startup hashes bind creation times and image identity; a PID alone is never proof. */
 export function verifyClosedEngineController(ref:WorkCycleControllerRef):WorkCycleRecovery['controller']{
   if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(ref.guardianId))fail();
-  const identity=ENGINE_GUARDIAN_IDENTITY,root=path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-pilot/native',ref.guardianId);
-  nativePinned(identity.binary,4*1024*1024);nativePinned(identity.proof,512*1024);nativePinned(identity.engine,256*1024*1024);
+  const identity=engineGuardianIdentity(),root=path.join(runtimePaths().pilotRoot,'native',ref.guardianId);
+  nativePinned(identity.binary,4*1024*1024);nativePinned(identity.proof,1024*1024);nativePinned(identity.engine,256*1024*1024);
   const bytes=nativeRead(path.join(root,'guardian-control/ready.json'),16384);if(nativeDigest(bytes)!==ref.readyVersion)fail();
   const port=JSON.parse(bytes.toString('utf8')).port;if(!Number.isSafeInteger(port)||port<1024||port>65535)fail();
   const binding={root,port,guardianPid:ref.guardianPid,identity},records=controllerRecords(binding);
@@ -53,9 +60,9 @@ export function verifyClosedEngineController(ref:WorkCycleControllerRef):WorkCyc
 }
 /** The engine inherits output pipes; only this exact guardian owns the parent-liveness stdin. */
 export function startEngineGuardian(options:Readonly<{root:string;port:number;env:NodeJS.ProcessEnv;identity:EngineGuardianIdentity}>){
-  const {identity,root,port}=options,base=path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-pilot/native');
+  const {identity,root,port}=options,base=path.join(runtimePaths().pilotRoot,'native');
   if(path.dirname(root)!==base||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(path.basename(root))||!Number.isSafeInteger(port)||port<1024||port>65535)fail();
-  nativePinned(identity.binary,4*1024*1024);nativePinned(identity.proof,512*1024);nativePinned(identity.engine,256*1024*1024);const rootChain=inspectNativePath(root,true).chain;
+  nativePinned(identity.binary,4*1024*1024);nativePinned(identity.proof,1024*1024);nativePinned(identity.engine,256*1024*1024);const rootChain=inspectNativePath(root,true).chain;
   // Keep this supervisor outside libuv's kill-on-parent-exit Job so stdin EOF can trigger its own bounded Job cleanup.
   const child:ChildProcessWithoutNullStreams=spawn(identity.binary.path,[root,String(port)],{cwd:path.join(root,'cwd'),env:options.env,windowsHide:true,detached:true,shell:false,stdio:['pipe','pipe','pipe']});
   let closed=false,spawned=false,stopSent=false,readyValue:EngineIdentity|null=null;let resolveClose!:()=>void;

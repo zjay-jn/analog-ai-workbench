@@ -13,6 +13,20 @@
 
 真实 OA 查询已在一个历史电路副本上验证，但此私人电路及运行环境不随公开源码分发。公开样例与真实工程的验证范围分别记录；目前不承诺任意 Virtuoso 工程、实时 GUI 同步或原理图修改。
 
+## 安装与启动
+
+源码安装支持 Windows x64 的本地固定磁盘。需要 Node.js `24.20.0`、npm `11.19.0`、Python 3.10+ 和 Visual Studio 2022 C++ Build Tools（含 Windows SDK）。
+
+```powershell
+npm ci
+npm run setup:desktop
+npm start
+```
+
+安装脚本准备固定版本的 OpenCode/Electron，构建原生组件并实际验证进程隔离和清理。首次打开可使用合成原理图；模型密钥在界面中配置。用户数据默认保存在 Windows AppData 中，与仓库分离，不读取旧机器的密钥文件或私人电路。
+
+详见 [安装说明](docs/INSTALLATION.md)。
+
 ## 源码验证
 
 Windows x64，Node.js `24.20.0`、npm `11.19.0`。版本以 `package.json` 和 `package-lock.json` 为准。
@@ -29,7 +43,7 @@ npm run check:public-source
 
 `.npmrc` 刻意关闭依赖安装脚本；源码检查不需要 Electron 二进制、模型密钥、WSL 或 Cadence。`check:public-source` 只向 `.local/public-source-check` 构建，不替换现有桌面程序。
 
-目前 `start:cloud` 仍依赖开发机路径、固定 OpenCode 与原生辅助程序的安装布局，**上述检查通过不代表干净克隆后能启动完整工作台**。完整运行所需的移植项与显式 Electron 安装步骤见 [开发说明](docs/DEVELOPMENT.md)。
+源码检查不安装桌面运行组件。普通启动前应完成 `setup:desktop`；`doctor` 检查运行就绪和构建前置条件。运行安装位置或用户数据根变化后，重新运行安装验证。当前为开发者源码安装，尚无免构建的发行安装包。
 
 ## 项目结构
 

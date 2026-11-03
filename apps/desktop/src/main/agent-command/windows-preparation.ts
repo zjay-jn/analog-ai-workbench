@@ -10,7 +10,7 @@ import { CommandError, CommandPreparationError, type CommandRecord } from './typ
 import { checkCommandPreparation } from './preparation';
 import { commandSignature } from './logs';
 import { nativeManifest, nativeManifestSha, type NativeManifestEntry } from './native-protocol';
-import { COMMAND_PRODUCT, nativeDigest, nativePinned, nativeRead, prepareNativeDirectory, type NativeFilePin } from './native-files';
+import { commandProduct, nativeDigest, nativePinned, nativeRead, prepareNativeDirectory, type NativeFilePin } from './native-files';
 
 type Directory=ReturnType<typeof prepareNativeDirectory>;
 const failurePath='control/preparation-failed.json';
@@ -38,7 +38,7 @@ export function prepareWindowsCommand(profile:CommandDriverProfile,record:Comman
   let directory:Directory|undefined,allocationAttempted=false;
   try{
     if(profile.environment.platform!=='windows'||record.intent.environment.platform!=='windows'||record.execution.environment.environmentId!==profile.environment.environmentId||record.execution.environment.revision!==profile.environment.revision||!isDeepStrictEqual(record.intent.environment,profile.environment)||baseline.runId!==record.execution.runId||baseline.workspaceId!==record.execution.workspaceId||baseline.version!==record.execution.baselineVersion)throw new CommandError('CONFLICT');
-    const volume=fs.statfsSync(COMMAND_PRODUCT,{bigint:true});checkCommandPreparation(record,profile.node.bytes+profile.license.bytes+profile.bootstrap.bytes+Buffer.byteLength(record.execution.commandText)+3,volume.bavail*volume.bsize,now());
+    const volume=fs.statfsSync(commandProduct(),{bigint:true});checkCommandPreparation(record,profile.node.bytes+profile.license.bytes+profile.bootstrap.bytes+Buffer.byteLength(record.execution.commandText)+3,volume.bavail*volume.bsize,now());
     const entries:NativeManifestEntry[]=[];
     for(const file of baseline.files){if(!isWorkCycleRelativePath(file.file.relativePath)||file.bytes.byteLength!==file.file.bytes||nativeDigest(file.bytes)!==file.file.version)throw new CommandError('SOURCE_CHANGED');entries.push({relativePath:file.file.relativePath,bytes:file.bytes.byteLength,sha256:file.file.version});}
     if(!isDeepStrictEqual(record.intent.baseline,baseline.files.map(({file})=>({fileId:file.fileId,relativePath:file.relativePath,version:file.version,bytes:file.bytes}))))throw new CommandError('CONFLICT');

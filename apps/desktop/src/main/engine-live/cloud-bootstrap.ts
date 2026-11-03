@@ -1,5 +1,7 @@
 /// <reference path="../schematic/cloud-raw-assets.d.ts" />
 import path from 'node:path';
+import fs from 'node:fs';
+import {runtimePaths} from '../runtime-paths';
 import {createCommandDiagnosticJournal} from '../agent-command/diagnostics';
 import {inspectNativePath} from '../agent-command/native-files';
 import productPackage from '../../../../../package.json';
@@ -8,7 +10,6 @@ import type { CloudProviderIdV2 } from '../../shared/agent/cloud-chat-api';
 import type { ImageAttachment } from '../../shared/agent/image-attachment';
 import { createProductionReviewedArtifactRegistryV1 } from '../schematic/reviewed-artifact-registry';
 import { createEmptyAgentBackendV1 } from '../agent/empty-agent-backend';
-import { readCloudCredentialFileV1 } from '../cloud/credential-file';
 import { performCloudChatV1, performCloudChatV2, type CloudFetchV1 } from '../cloud/cloud-transport';
 import { createModelSettings, type KeyEncryption, type ModelSettingsHost } from '../cloud/model-settings-host';
 import { sessionExtension } from '../cloud/register-session-ipc';
@@ -55,6 +56,7 @@ export type CloudDesktopDependencies = Readonly<{
   nativeFactory: typeof startOpenCodeSupervisor;
   liveBudget: Readonly<{ maxRequests: number; maxOutputTokens: number; requestTimeoutMs: number; deadlineMs: number; waitMs: number }>;
   loadReviewed: ReturnType<typeof createReviewedSourceLoader>;
+  reviewedConfigured?: () => boolean;
   loadSynthetic: CloudSchematicHostOptions['loadRaw'];
   chooseExportFile?: ChooseFile;
   chooseEditFile?: ChooseFile;
@@ -69,9 +71,11 @@ export type CloudDesktopDependencies = Readonly<{
 export type CloudDesktopOptions = Readonly<{
   mode: 'production';
   applicationRoot: string;
+  storageRoot?: string;
 }> | Readonly<{
   mode: 'qa';
   applicationRoot: string;
+  storageRoot?: string;
   dataRoot: string;
   profileRoot: string;
   dependencies: CloudDesktopDependencies;
@@ -79,11 +83,11 @@ export type CloudDesktopOptions = Readonly<{
 type PreparedCloudOptions = Readonly<{
   mode: 'production' | 'qa';
   applicationRoot: string;
+  storageRoot?: string;
   dataRoot: string;
   profileRoot: string;
   dependencies: CloudDesktopDependencies;
 }>;
-const PRODUCT_ROOT = path.resolve('C:/work/analog_ai_workbench');
 const fail = (): never => { throw Error('CLOUD_BOOTSTRAP_CONFIGURATION'); };
 function inside(parent: string, child: string): boolean {
   const relative = path.relative(parent, child);
@@ -91,10 +95,13 @@ function inside(parent: string, child: string): boolean {
 }
 function validate(options: PreparedCloudOptions): void {
   if (!options || !['production', 'qa'].includes(options.mode)) fail();
+  // Both anchors are fixed by the main entry before this module is initialized.
+  // An options object cannot substitute an arbitrary installation or data root.
+  const trusted = runtimePaths(), PRODUCT_ROOT = trusted.storageRoot;
+  if (options.applicationRoot !== trusted.installationRoot || (options.storageRoot ?? options.applicationRoot) !== PRODUCT_ROOT) fail();
   for (const name of ['applicationRoot', 'dataRoot', 'profileRoot'] as const) {
     if (typeof options[name] !== 'string' || !path.isAbsolute(options[name]) || path.resolve(options[name]) !== options[name]) fail();
   }
-  if (options.applicationRoot !== PRODUCT_ROOT && !inside(PRODUCT_ROOT, options.applicationRoot)) fail();
   if (options.mode === 'qa') {
     const relative = path.relative(PRODUCT_ROOT, options.dataRoot).replaceAll('\\', '/');
     if (!/^\.local\/agent-engine-live-tests\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(relative) || !inside(options.dataRoot, options.profileRoot)) fail();
@@ -111,7 +118,7 @@ function validate(options: PreparedCloudOptions): void {
     const value = dependencies.liveBudget[name];
     if (!Number.isSafeInteger(value) || value < 1 || value > caps[name]) fail();
   }
-  for (const name of ['chooseExportFile', 'chooseEditFile', 'chooseFolder', 'validateImages', 'onTraffic', 'onShutdownFailure', 'createOaRuntime'] as const) {
+  for (const name of ['chooseExportFile', 'chooseEditFile', 'chooseFolder', 'validateImages', 'onTraffic', 'onShutdownFailure', 'createOaRuntime', 'reviewedConfigured'] as const) {
     if (dependencies[name] !== undefined && typeof dependencies[name] !== 'function') fail();
   }
 }
@@ -119,6 +126,7 @@ function validate(options: PreparedCloudOptions): void {
 /** Importing this module and preparing options never open credentials, stores, Electron or native. */
 export function createCloudDesktopOptions(options: PreparedCloudOptions): DesktopBootstrapOptionsV1 {
   validate(options);
+  const PRODUCT_ROOT = runtimePaths().storageRoot;
   // Capture main-only references once so later caller mutation cannot swap transports.
   const dependencies = Object.freeze({ ...options.dependencies, encryption: Object.freeze({ ...options.dependencies.encryption }), liveBudget: Object.freeze({ ...options.dependencies.liveBudget }) });
   const { applicationRoot, dataRoot } = options;
@@ -163,7 +171,7 @@ export function createCloudDesktopOptions(options: PreparedCloudOptions): Deskto
         tools = pilotExtension({ store: toolStore, engine: runtime })(context);
         const workspace = workspaceExtension({ root: PRODUCT_ROOT, directory: path.join(dataRoot, 'project-workspace'), activeSessionId: () => sessionHost?.activeSessionId() ?? null })(context);
         cleanup.register(workspace);
-        const reviewed = reviewedSchematicExtension({ hasProject: workspace.hasProject, loadEnvelope: dependencies.loadReviewed })(context);
+        const reviewed = reviewedSchematicExtension({ hasProject: workspace.hasProject, loadEnvelope: dependencies.loadReviewed, ...(dependencies.reviewedConfigured ? {isConfigured: dependencies.reviewedConfigured} : {}) })(context);
         cleanup.register(reviewed);
         cleanup.register(reviewedSaveExtension(name => dependencies.chooseEditFile?.(name, context) ?? Promise.resolve(undefined))(context));
         cleanup.register(displayPathExtension({ root: PRODUCT_ROOT, directory: path.join(dataRoot, 'display-paths') })(context));
@@ -175,6 +183,8 @@ export function createCloudDesktopOptions(options: PreparedCloudOptions): Deskto
         const project = projectReadExtension({ store: projectStore, bindings: folders, models, arbiter,
           ...(dependencies.createOaRuntime?{createOaRuntime:dependencies.createOaRuntime}:{}),
           protectedRoots:Object.freeze([
+            options.applicationRoot, path.join(options.applicationRoot,'.local','runtime'),
+            dataRoot, path.join(PRODUCT_ROOT,'.local'),
             ...[dataRoot,path.join(PRODUCT_ROOT,'.local')].flatMap(root=>['model-settings','chat-history','chat-drafts','project-workspace','project-folders','display-paths','agent-engine-live','agent-project-read','agent-project-read-model','agent-work-cycle','agent-command','diagnostics','wsl-results'].map(name=>path.join(root,name))),
             options.profileRoot,path.join(PRODUCT_ROOT,'.local','cloud-user-data'),
             ...['agent-engine-pilot','agent-engine-candidate-v1.18.17','agent-work-cycle-runner','agent-command-runner'].map(name=>path.join(PRODUCT_ROOT,'.local',name)),
@@ -226,35 +236,49 @@ export function createCloudDesktopOptions(options: PreparedCloudOptions): Deskto
 }
 
 /** Normal cloud and isolated QA use this same bootstrap and extension composition. */
+function prepareStorageRoots(): void {
+  const {storageRoot, dataRoot} = runtimePaths();
+  const check = (directory: string) => {
+    const chain: string[] = []; let current = directory;
+    for (;;) { chain.unshift(current); const parent = path.dirname(current); if (parent === current) break; current = parent; }
+    for (const item of chain) {
+      const stat = fs.lstatSync(item);
+      if (!stat.isDirectory() || stat.isSymbolicLink() || path.resolve(fs.realpathSync.native(item)).toLowerCase() !== item.toLowerCase()) fail();
+    }
+  };
+  check(path.dirname(storageRoot));
+  for (const directory of [storageRoot, dataRoot]) {
+    try { fs.mkdirSync(directory); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+    check(directory);
+  }
+}
+
 export async function startCloudDesktop(options: CloudDesktopOptions): Promise<void> {
   let prepared: PreparedCloudOptions;
   if (options.mode === 'qa') {
     prepared = options;
     validate(prepared);
   } else if (options.mode === 'production') {
+    const trusted = runtimePaths(), PRODUCT_ROOT = trusted.storageRoot;
+    if (options.applicationRoot !== trusted.installationRoot || options.storageRoot !== undefined && options.storageRoot !== PRODUCT_ROOT) fail();
+    prepareStorageRoots();
     const electron = await import('electron');
     const chooseWindow = (context: ExtensionContext) => {
       const contents = electron.webContents.fromId(context.owner.webContentsId);
       return contents ? electron.BrowserWindow.fromWebContents(contents) : null;
     };
     prepared = {
-      ...options, dataRoot: path.join(PRODUCT_ROOT, '.local'), profileRoot: path.join(PRODUCT_ROOT, '.local', 'cloud-user-data'),
+      ...options, storageRoot: PRODUCT_ROOT, dataRoot: trusted.dataRoot, profileRoot: trusted.profileRoot,
       dependencies: {
         appVersion:productPackage.version,
         revealDiagnostics:async()=>{const file=path.join(PRODUCT_ROOT,'.local','diagnostics','diagnostics.jsonl');try{inspectNativePath(file,false);electron.shell.showItemInFolder(file);return true;}catch{return false;}},
-        credentials: () => {
-          const keys: Credentials = {};
-          for (const provider of ['deepseek', 'kimi'] as const) {
-            try { keys[provider] = readCloudCredentialFileV1({ provider, filePath: 'D:/api.txt', authorizedFilePath: 'D:/api.txt' }); } catch { /* configured=false */ }
-          }
-          return keys;
-        },
+        credentials: () => ({}),
         encryption: { available: () => process.platform === 'win32' && electron.safeStorage.isEncryptionAvailable(), encrypt: text => electron.safeStorage.encryptString(text).toString('base64'), decrypt: ciphertext => electron.safeStorage.decryptString(Buffer.from(ciphertext, 'base64')) },
         chatV1: performCloudChatV1, chatV2: performCloudChatV2,
         providerFetch: (url, init) => fetch(url, init), nativeFactory: startOpenCodeSupervisor,
         liveBudget: { maxRequests: 8, maxOutputTokens: 16384, requestTimeoutMs: 600_000, deadlineMs: 4_800_000, waitMs: 1_800_000 },
-        loadReviewed: createReviewedSourceLoader(PRODUCT_ROOT),
-        createOaRuntime: scope => createOaReadRuntime({...scope,loadReviewed:createReviewedSourceLoader(PRODUCT_ROOT)}),
+        loadReviewed: createReviewedSourceLoader(options.applicationRoot),
+        reviewedConfigured: () => false,
         loadSynthetic: async () => {
           const [fixture, manifest] = await Promise.all([
             import('../../../../../packages/schematic-workbench/fixtures/cloud-demo.json?raw'),
