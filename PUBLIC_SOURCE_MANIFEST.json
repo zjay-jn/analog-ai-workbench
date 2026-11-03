@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aaw.public-source-export/v1",
   "policySha256": "deef0dfa69e58ccd0a2fb423143c671bcb0e59bdf8aa30f671a10b8e735fab3b",
-  "planSha256": "f229223c39f462525908aec2c7cac0f39684958c659a1f2a9f421bb89835e782",
+  "planSha256": "6fdc850550679a0fddd54a7bba655b32495212e3912b3063ac62c682ba5205d1",
   "files": [
     {
       "source": ".gitattributes",
@@ -3654,8 +3654,8 @@
     {
       "source": "tests/portable-desktop-smoke.test.mjs",
       "destination": "tests/portable-desktop-smoke.test.mjs",
-      "bytes": 6900,
-      "sha256": "6ffbaad3e9faa8c13ed405b1a8777404c9293f773ef67a4513d51e0ddf189c00"
+      "bytes": 9007,
+      "sha256": "5080b7675bf5e95933e547af552f419310a81bc07eb180eafc3ab6333fb3283c"
     },
     {
       "source": "tests/portable-reviewed-source.test.ts",
@@ -4182,8 +4182,8 @@
     {
       "source": "tools/agent-work-cycle-runner-native-security.h",
       "destination": "tools/agent-work-cycle-runner-native-security.h",
-      "bytes": 23477,
-      "sha256": "47e78f6d55e7bac0736d42de6ed569fb119b9c21e7949d336e7852ac9b42c015"
+      "bytes": 25037,
+      "sha256": "e2a5bf22ea775f247cc3b2a092edaf4170f75418d03a5598ad351436dba148ef"
     },
     {
       "source": "tools/agent-work-cycle-runner-native.cc",
@@ -4250,6 +4250,12 @@
       "destination": "tools/license-inventory.mjs",
       "bytes": 1990,
       "sha256": "9700308bc7596e3536fbc4e2bfa7c3972b292cce96ecefbef418d8037d182b8d"
+    },
+    {
+      "source": "tools/native-acl-control-test.cc",
+      "destination": "tools/native-acl-control-test.cc",
+      "bytes": 2553,
+      "sha256": "80e25033a86f89487e521c6b892c4e058b4a54fc5e7f26abde5f8c86a0db9fc5"
     },
     {
       "source": "tools/native-save-crash-worker.mjs",
@@ -4434,20 +4440,20 @@
     {
       "source": "tools/portable-desktop-smoke-main.cjs",
       "destination": "tools/portable-desktop-smoke-main.cjs",
-      "bytes": 16074,
-      "sha256": "a96510ed74b2b2a932a2cc9c3cca0e2fa57fb0d6e965a00c64277ffb401803de"
+      "bytes": 16279,
+      "sha256": "d0cd74ca1c857749df6795a8ddf9818bc84319d7f7053d7091fc5febcc151be7"
     },
     {
       "source": "tools/portable-desktop-smoke.mjs",
       "destination": "tools/portable-desktop-smoke.mjs",
-      "bytes": 12109,
-      "sha256": "cb6e8f99afa5f030635ade9bc5b419dc539c4e8a6268abefd122c41efaf7d86a"
+      "bytes": 14061,
+      "sha256": "7d076705ba8048988ff7f6b9f3b83acf55e0f36b8a6c6c282f365ce47d00d75f"
     },
     {
       "source": "tools/portable-native-build.mjs",
       "destination": "tools/portable-native-build.mjs",
-      "bytes": 27307,
-      "sha256": "900a5b20259f5dab00839ba211ef20b189e769dfe08d99f1cfa9ad359fc29239"
+      "bytes": 29270,
+      "sha256": "22be0ef296b8c75d5ba172101b12549f0ca4e50b2483e10e49dd716aacd0e886"
     },
     {
       "source": "tools/portable-runtime-lib.mjs",

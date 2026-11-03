@@ -76,6 +76,19 @@ function compile(toolchain,output,source,name) {
   fs.writeFileSync(path.join(output,name+'-compiler.log'),(result.stdout??'')+(result.stderr??''));
   if(result.error||result.status!==0)throw Error('NATIVE_COMPILE_FAILED_'+name);return executable;
 }
+function aclControlSelfTest(paths,toolchain,output,buildId){
+  const executable=compile(toolchain,output,path.join(paths.root,'tools/native-acl-control-test.cc'),'native-acl-control-test');
+  const executablePin=ref(paths.root,executable);
+  const result=spawnSync(executable,[],{cwd:output,shell:false,windowsHide:true,encoding:'utf8',timeout:5000,maxBuffer:16384,env:{SystemRoot:process.env.SystemRoot,windir:process.env.SystemRoot}});
+  const directory=path.join(paths.runtimeRoot,'verification','acl-control-'+buildId);mkdir(directory);
+  write(path.join(directory,'stdout.log'),result.stdout??'');write(path.join(directory,'stderr.log'),result.stderr??'');
+  let report=null;try{report=JSON.parse((result.stdout??'').trim());}catch{}
+  let executableUnchanged=false;try{executableUnchanged=ordinary(executable).size===executablePin.bytes&&sha(executable)===executablePin.sha256;}catch{}
+  const okay=executableUnchanged&&!result.error&&result.status===0&&report?.schema==='aaw.native-acl-control-test/v1'&&report.status==='PASS'&&report.cases===24&&report.failed===0&&Array.isArray(report.failures)&&report.failures.length===0;
+  const proof={schema:'aaw.native-acl-control-verification/v1',status:okay?'PASS':'FAIL',buildId,executable:executablePin,executableUnchanged,exitCode:result.status,signal:result.signal,error:result.error?.code??null,report,sources:sources(paths.root,['tools/native-acl-control-test.cc','tools/agent-work-cycle-runner-native-security.h','tools/portable-native-build.mjs']),scope:'Production control-bit helper, pure in-memory cases; no filesystem ACL changes, profile or child execution.'};
+  const proofFile=write(path.join(directory,'result.json'),JSON.stringify(proof,null,2)+'\n');
+  if(!okay)throw Error('NATIVE_ACL_CONTROL_SELF_TEST_FAILED');return ref(paths.root,proofFile);
+}
 async function workSelfTest(paths,components,buildId) {
   const {root,dataRoot,runtimeRoot}=paths,id='wce-'+crypto.randomUUID(),execution=path.join(dataRoot,'agent-work-cycle-runner/executions',id),runtime=path.join(execution,'runtime');
   const snapshot=path.join(dataRoot,'runtime-self-test',buildId,id),input=path.join(snapshot,'input'),output=path.join(snapshot,'output');
@@ -145,7 +158,7 @@ async function guardianSelfTest(paths,components,buildId) {
 
 export async function buildPortableNative(paths) {
   const {root,runtimeRoot,dataRoot}=paths,buildId=crypto.randomUUID(),output=path.join(runtimeRoot,'build',buildId);mkdir(output);mkdir(dataRoot);
-  const sourceBaseline=sources(root,['tools/agent-engine-lifecycle-guardian.cc','tools/agent-command-runner-native.cc','tools/agent-work-cycle-runner-native.cc','tools/agent-work-cycle-runner-native-security.h','tools/agent-command-runner-bootstrap.ps1','tools/portable-native-build.mjs','tools/portable-runtime-lib.mjs','packages/windows-fs-native/src/addon.cc','packages/windows-fs-native/binding.gyp','apps/desktop/src/shared/agent/agent-work-cycle.ts']);
+  const sourceBaseline=sources(root,['tools/agent-engine-lifecycle-guardian.cc','tools/agent-command-runner-native.cc','tools/agent-work-cycle-runner-native.cc','tools/agent-work-cycle-runner-native-security.h','tools/native-acl-control-test.cc','tools/agent-command-runner-bootstrap.ps1','tools/portable-native-build.mjs','tools/portable-runtime-lib.mjs','packages/windows-fs-native/src/addon.cc','packages/windows-fs-native/binding.gyp','apps/desktop/src/shared/agent/agent-work-cycle.ts']);
   const toolchain=findToolchain(),python=findPython(),shell=shellProfile(root),limits=numericLimits(root),wide=value=>'L'+JSON.stringify(value);
   const runtimeHeader=write(path.join(output,'runtime-paths.h'),'#pragma once\nnamespace portable_runtime {\ninline constexpr wchar_t dataLocal[]='+wide(dataRoot+path.sep)+';\ninline constexpr wchar_t installationRuntime[]='+wide(runtimeRoot+path.sep)+';\ninline constexpr wchar_t systemRoot[]='+wide(shell.windows)+';\n}\n');
   const limitHeader=write(path.join(output,'runner-limits.h'),'#pragma once\n#include <cstddef>\nnamespace limits {\n'+Object.entries(limits).map(([key,value])=>'inline constexpr std::size_t '+key+'='+value+';').join('\n')+'\n}\n');
@@ -154,6 +167,7 @@ export async function buildPortableNative(paths) {
   const commandHeader=write(path.join(output,'command-profile.h'),'#pragma once\nnamespace profile {\ninline constexpr wchar_t shellPath[]='+wide(shell.shell)+';\ninline constexpr char revision[]='+JSON.stringify(profileRevision)+';\ninline constexpr unsigned long long bootstrapBytes='+declaration.bootstrap.bytes+';\ninline constexpr char bootstrapSha256[]='+JSON.stringify(declaration.bootstrap.sha256)+';\nstruct File {const wchar_t* path;unsigned long long bytes;const char* sha256;};\ninline constexpr File systemFiles[]={\n'+shell.systemFiles.map(file=>'{'+wide(file.path)+','+file.bytes+','+JSON.stringify(file.sha256)+'}').join(',\n')+'\n};\n}\n');
   const generatedBaseline=[runtimeHeader,limitHeader,commandHeader].map(file=>ref(root,file));
   const unchanged=()=>sourceBaseline.every(file=>sha(path.join(root,file.path))===file.sha256)&&generatedBaseline.every(file=>sha(path.join(root,file.path))===file.sha256)&&sha(toolchain.compiler)===toolchain.compilerSha256;
+  const aclControlProof=aclControlSelfTest(paths,toolchain,output,buildId);
   const binaries={guardian:compile(toolchain,output,path.join(root,'tools/agent-engine-lifecycle-guardian.cc'),'guardian'),commandRunner:compile(toolchain,output,path.join(root,'tools/agent-command-runner-native.cc'),'command-runner'),workRunner:compile(toolchain,output,path.join(root,'tools/agent-work-cycle-runner-native.cc'),'work-runner')};
   const fsSource=path.join(output,'fs-source');mkdir(path.join(fsSource,'src'));fs.copyFileSync(path.join(root,'packages/windows-fs-native/src/addon.cc'),path.join(fsSource,'src/addon.cc'));fs.copyFileSync(path.join(root,'packages/windows-fs-native/binding.gyp'),path.join(fsSource,'binding.gyp'));
   const gypArgs=[nodeGyp(),'rebuild','--release','--directory='+fsSource,'--nodedir='+path.join(runtimeRoot,'node/headers'),'--msvs_version=2022','--python='+python.path];
@@ -167,7 +181,7 @@ export async function buildPortableNative(paths) {
   const admissionCandidate=write(path.join(output,'command-admission.json'),JSON.stringify(admission,null,2)+'\n');publish(root,admissionCandidate,path.join(runtimeRoot,'command-admission.json'),buildId);components.commandAdmission={...ref(root,path.join(runtimeRoot,'command-admission.json')),sources:[]};
   components.workProof=await workSelfTest(paths,components,buildId);const guardianProof=await guardianSelfTest(paths,components,buildId);
   if(!unchanged())throw Error('NATIVE_BUILD_INPUT_CHANGED');
-  const manifest={schemaVersion:'aaw.desktop-runtime/v1',platform:'win32',arch:'x64',nodeVersion:'24.20.0',dataRoot,components,build:{id:buildId,exitCode:0,compiler:{path:toolchain.compiler,sha256:toolchain.compilerSha256},python,sdk:toolchain.sdk,generated:[runtimeHeader,limitHeader,commandHeader].map(file=>ref(root,file)),guardianSelfTest:guardianProof,commandStatus:'built_only'}};
+  const manifest={schemaVersion:'aaw.desktop-runtime/v1',platform:'win32',arch:'x64',nodeVersion:'24.20.0',dataRoot,components,build:{id:buildId,exitCode:0,compiler:{path:toolchain.compiler,sha256:toolchain.compilerSha256},python,sdk:toolchain.sdk,generated:[runtimeHeader,limitHeader,commandHeader].map(file=>ref(root,file)),aclControlSelfTest:aclControlProof,guardianSelfTest:guardianProof,commandStatus:'built_only'}};
   const manifestCandidate=write(path.join(output,'runtime-manifest.json'),JSON.stringify(manifest,null,2)+'\n');publish(root,manifestCandidate,path.join(runtimeRoot,'runtime-manifest.json'),buildId);
   console.log(JSON.stringify({status:'BUILT_AND_NATIVE_SELF_TESTED',commandAdmission:'BUILT_ONLY',buildId,manifest:'.local/runtime/runtime-manifest.json'}));
   return manifest;

@@ -9,7 +9,7 @@ const {syncBuiltinESMExports} = require('node:module');
 app.disableHardwareAcceleration();
 
 async function smoke() {
-  const {checkoutRoot, artifactRoot, parseSmokeOptions, assertUnaliased, assertFirstProfile, smokeAddonPin} = await import('./portable-desktop-smoke.mjs');
+  const {checkoutRoot, artifactRoot, parseSmokeOptions, assertUnaliased, assertFirstProfile, smokeAddonPin, captureSmokePage} = await import('./portable-desktop-smoke.mjs');
   const {ordinary} = await import('./portable-runtime-lib.mjs');
   const planFile = process.argv[2];
   if (!planFile || !path.isAbsolute(planFile)) throw Error('SMOKE_PLAN_INVALID');
@@ -34,7 +34,7 @@ async function smoke() {
   if (plan.phase === 'first') assertFirstProfile(options.storageRoot);
   const report = {schemaVersion: 'aaw.portable-ui-startup/v1', phase: plan.phase, status: 'RUNNING',
     productionEntry, productionEntrySha256: plan.productionEntrySha256, storageRoot: plan.storageRoot, profileRoot: plan.profileRoot,
-    networkAttempts: [], childProcessAttempts: [], forbiddenFilesystemAttempts: [], rendererFailures: [], shutdownFailures: [], normalQuit: false, windowClosed: false, addonLoaded: false};
+    networkAttempts: [], childProcessAttempts: [], forbiddenFilesystemAttempts: [], rendererFailures: [], shutdownFailures: [], captureAttempts: [], processDiagnostics: [], normalQuit: false, windowClosed: false, addonLoaded: false};
   const resultFile = path.join(output, 'result.json');
   const save = () => fs.writeFileSync(resultFile, JSON.stringify(report, null, 2) + '\n');
   const clearBoundaries = () => ['networkAttempts', 'childProcessAttempts', 'forbiddenFilesystemAttempts', 'rendererFailures', 'shutdownFailures'].every(key => report[key].length === 0);
@@ -44,6 +44,7 @@ async function smoke() {
     for (const value of values) if (value === 'CLOUD_SHUTDOWN_FAILED' || value === 'CLOUD_SHUTDOWN_TIMEOUT') report.shutdownFailures.push(value);
     return originalConsoleError.apply(this, values);
   };
+  app.on('child-process-gone', (_event, details) => {report.processDiagnostics.push({type: details.type, reason: details.reason, exitCode: details.exitCode}); save();});
 
   // Guards apply only to this new test process. They are not an OS-wide sandbox.
   const denied = plan.forbiddenRoots.map(root => path.resolve(root).replaceAll('\\', '/').toLowerCase());
@@ -119,10 +120,9 @@ async function smoke() {
         if (plan.phase === 'cold' && (project.name !== plan.marker || !state.text.includes(plan.marker) || workspace.value.revision < 1)) throw Error('COLD_PROJECT_NOT_RESTORED');
         report.workspace = {revision: workspace.value.revision, projects: workspace.value.projects.length, name: project.name, sessions: 0};
         report.stage = 'capture-main';
-        const image = await window.webContents.capturePage();
-        if (image.isEmpty()) throw Error('SCREENSHOT_EMPTY');
-        fs.writeFileSync(path.join(output, 'workbench.png'), image.toPNG());
-        report.screenshot = 'workbench.png'; report.screenshotSize = image.getSize();
+        const image = await captureSmokePage(window, 'workbench', attempt => {report.captureAttempts.push(attempt); save();});
+        fs.writeFileSync(path.join(output, 'workbench.png'), image.png);
+        report.screenshot = 'workbench.png'; report.screenshotSize = image.size;
         if (plan.phase === 'first') {
           report.stage = 'open-synthetic-menu';
           let openedMenu = false;
@@ -146,9 +146,8 @@ async function smoke() {
           }
           if (schematic?.status !== 'ready' || !schematic.svg || schematic.graphics < 4 || schematic.width <= 0 || schematic.height <= 0) throw Error('SYNTHETIC_NOT_RENDERED');
           report.stage = 'capture-synthetic'; await sleep(300);
-          const syntheticImage = await window.webContents.capturePage();
-          if (syntheticImage.isEmpty()) throw Error('SYNTHETIC_SCREENSHOT_EMPTY');
-          fs.writeFileSync(path.join(output, 'synthetic.png'), syntheticImage.toPNG());
+          const syntheticImage = await captureSmokePage(window, 'synthetic', attempt => {report.captureAttempts.push(attempt); save();});
+          fs.writeFileSync(path.join(output, 'synthetic.png'), syntheticImage.png);
           report.synthetic = {...schematic, openedThrough: 'FileWorkbench menu DOM click -> renderer openSynthetic controller', screenshot: 'synthetic.png'};
           report.stage = 'persist-project-marker';
           const persisted = await window.webContents.executeJavaScript(`(async()=>{const response=await window.workbenchWorkspace.read({contractVersion:${JSON.stringify(plan.workspaceVersion)}});if(!response.ok)return response;const state=response.value;state.projects[0].name=${JSON.stringify(plan.marker)};return window.workbenchWorkspace.save({contractVersion:${JSON.stringify(plan.workspaceVersion)},expectedRevision:state.revision,state});})()`);

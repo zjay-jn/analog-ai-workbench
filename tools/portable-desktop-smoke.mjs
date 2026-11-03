@@ -84,6 +84,35 @@ export function smokeAddonPin(installationRoot, storageRoot) {
   return {path: file, bytes: component.bytes, sha256: component.sha256};
 }
 
+/** Wait for painting, and retry one transient Viz surface-copy failure only. */
+export async function captureSmokePage(window, label, record, {wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)), timeoutMs = 4000} = {}) {
+  const bounded = async (operation, code) => {
+    let timer;
+    try {return await Promise.race([operation(), new Promise((_, reject) => {timer = setTimeout(() => reject(Error(code)), timeoutMs);})]);}
+    finally {clearTimeout(timer);}
+  };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const observation = {label, attempt, visible: window.isVisible(), minimized: window.isMinimized(), contentSize: window.getContentSize()};
+    try {
+      if (window.isMinimized()) window.restore();
+      window.showInactive();
+      window.webContents.setBackgroundThrottling(false);
+      observation.frame = await bounded(() => window.webContents.executeJavaScript(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve({visibility:document.visibilityState,width:innerWidth,height:innerHeight}))))`), 'SCREENSHOT_FRAME_TIMEOUT');
+      const image = await bounded(() => window.webContents.capturePage(undefined, {stayHidden: false, stayAwake: true}), 'SCREENSHOT_CAPTURE_TIMEOUT');
+      if (image.isEmpty()) throw Error('SCREENSHOT_EMPTY');
+      const size = image.getSize(), png = image.toPNG();
+      if (size.width <= 0 || size.height <= 0 || !Buffer.isBuffer(png) || png.length <= 24 || !png.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) throw Error('SCREENSHOT_INVALID');
+      record({...observation, status: 'PASS', size, pngBytes: png.length});
+      return {png, size};
+    } catch (error) {
+      record({...observation, status: 'FAIL', error: String(error.message).slice(0, 200)});
+      if (error.message !== 'UnknownVizError' || attempt === 2) throw error;
+      await wait(300);
+    }
+  }
+  throw Error('SCREENSHOT_UNAVAILABLE');
+}
+
 function contract(file, name) {
   ordinary(file);
   const match = fs.readFileSync(file, 'utf8').match(new RegExp(`export const ${name}\\s*=\\s*'([^']+)'`));

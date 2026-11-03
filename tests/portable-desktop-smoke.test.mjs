@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID, createHash} from 'node:crypto';
-import {parseSmokeOptions, assertFirstProfile, assertUnaliased, runDesktopSmoke, smokeAddonPin, checkoutRoot, artifactRoot} from '../tools/portable-desktop-smoke.mjs';
+import {parseSmokeOptions, assertFirstProfile, assertUnaliased, runDesktopSmoke, smokeAddonPin, captureSmokePage, checkoutRoot, artifactRoot} from '../tools/portable-desktop-smoke.mjs';
 
 const cases = path.join(checkoutRoot, '.local/desktop-smoke-unit');
 fs.mkdirSync(cases, {recursive: true});
@@ -86,4 +86,36 @@ test('addon admission rejects a hardlinked component even when its content match
   fs.writeFileSync(manifestFile, JSON.stringify({schemaVersion: 'aaw.desktop-runtime/v1', platform: 'win32', arch: 'x64', dataRoot: path.join(storage, '.local'), components: {windowsFs: component}}));
   fs.linkSync(file, path.join(root, 'alias.node'));
   assert.throws(() => smokeAddonPin(root, storage), /RUNTIME_NOT_ORDINARY/);
+});
+
+function captureFixture(capture) {
+  return {isVisible: () => true, isMinimized: () => false, getContentSize: () => [1480, 920], showInactive() {},
+    webContents: {setBackgroundThrottling() {}, executeJavaScript: async () => ({visibility: 'visible', width: 1480, height: 920}), capturePage: capture}};
+}
+function imageFixture(empty = false) {
+  return {isEmpty: () => empty, getSize: () => ({width: 1480, height: 920}), toPNG: () => Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), Buffer.alloc(24)])};
+}
+
+test('a transient Viz failure is retained and retried once before accepting a real image', async () => {
+  let calls = 0; const attempts = [];
+  const window = captureFixture(async () => {if (++calls === 1) throw Error('UnknownVizError'); return imageFixture();});
+  const result = await captureSmokePage(window, 'workbench', attempt => attempts.push(attempt), {wait: async () => {}});
+  assert.equal(calls, 2); assert.deepEqual(attempts.map(attempt => attempt.status), ['FAIL', 'PASS']);
+  assert.equal(attempts[0].error, 'UnknownVizError'); assert.equal(result.size.width, 1480);
+});
+
+test('persistent Viz failures, unrelated failures and empty captures never pass', async () => {
+  for (const [message, expectedCalls] of [['UnknownVizError', 2], ['RENDERER_GONE', 1]]) {
+    let calls = 0;
+    await assert.rejects(captureSmokePage(captureFixture(async () => {calls++; throw Error(message);}), 'workbench', () => {}, {wait: async () => {}}), new RegExp(message));
+    assert.equal(calls, expectedCalls);
+  }
+  await assert.rejects(captureSmokePage(captureFixture(async () => imageFixture(true)), 'workbench', () => {}), /SCREENSHOT_EMPTY/);
+});
+
+test('frame readiness is bounded and a hung renderer never reaches screenshot capture', async () => {
+  let captures = 0; const window = captureFixture(async () => {captures++; return imageFixture();});
+  window.webContents.executeJavaScript = () => new Promise(() => {});
+  await assert.rejects(captureSmokePage(window, 'workbench', () => {}, {timeoutMs: 15}), /SCREENSHOT_FRAME_TIMEOUT/);
+  assert.equal(captures, 0);
 });

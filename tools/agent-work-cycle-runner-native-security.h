@@ -142,12 +142,22 @@ std::string Hash(HANDLE file,ULONGLONG expected){
     BCryptDestroyHash(hash);BCryptCloseAlgorithmProvider(algorithm,0);return Hex(value.data(),value.size());
   }catch(...){if(hash)BCryptDestroyHash(hash);BCryptCloseAlgorithmProvider(algorithm,0);throw;}
 }
+bool RestoredDaclControlEquivalent(SECURITY_DESCRIPTOR_CONTROL prior,SECURITY_DESCRIPTOR_CONTROL current,bool directory){
+  const auto changed=static_cast<SECURITY_DESCRIPTOR_CONTROL>(prior^current);
+  if((changed&(SE_DACL_PROTECTED|SE_DACL_AUTO_INHERITED))==0)return true;
+  // SetSecurityInfo can mark an unprotected directory as auto-inherited while
+  // restoring the exact original ACL. Accept only that observed forward change.
+  return directory&&!(prior&SE_DACL_PROTECTED)&&!(current&SE_DACL_PROTECTED)
+    &&changed==SE_DACL_AUTO_INHERITED&&!(prior&SE_DACL_AUTO_INHERITED)&&(current&SE_DACL_AUTO_INHERITED);
+}
 struct GrantState {Handle handle;PSECURITY_DESCRIPTOR descriptor=nullptr;SECURITY_DESCRIPTOR_CONTROL control=0;FILE_ID_INFO identity{};std::wstring path;bool directory=false;};
 std::vector<GrantState> grants;
 // Cleanup diagnostics are observations only. Never use them to admit execution
 // or replace the exact ACL/control comparison below, and never serialize paths/SIDs.
 std::string aclFailureItems;
 size_t aclFailureCount=0,aclFailureOmitted=0;
+std::string aclNormalizationItems;
+size_t aclNormalizationCount=0,aclNormalizationOmitted=0;
 PSID diagnosticPackageSid=nullptr;
 std::string outputCleanupDiagnostic="null";
 std::string AclDiagnosticHash(const unsigned char* bytes,ULONG count){
@@ -177,8 +187,8 @@ void AclFailure(size_t index,const GrantState& item,const std::string& observati
   }catch(...){++aclFailureOmitted;}
 }
 void RecordAclCleanupDiagnostics(bool restored,bool normalized){
-  if(restored&&normalized)return;
-  try{Record(L"acl-diagnostics",std::string("{\"schema\":\"aaw.native.acl-cleanup-diagnostic/v1\",\"restoreGrants\":")+(restored?"true":"false")+",\"normalizeOutput\":"+(normalized?"true":"false")+",\"failureCount\":"+std::to_string(aclFailureCount)+",\"omitted\":"+std::to_string(aclFailureOmitted)+",\"failures\":["+aclFailureItems+"],\"output\":"+outputCleanupDiagnostic+"}");}catch(...){}
+  if(restored&&normalized&&aclNormalizationCount==0)return;
+  try{Record(L"acl-diagnostics",std::string("{\"schema\":\"aaw.native.acl-cleanup-diagnostic/v1\",\"restoreGrants\":")+(restored?"true":"false")+",\"normalizeOutput\":"+(normalized?"true":"false")+",\"failureCount\":"+std::to_string(aclFailureCount)+",\"omitted\":"+std::to_string(aclFailureOmitted)+",\"failures\":["+aclFailureItems+"],\"normalizationCount\":"+std::to_string(aclNormalizationCount)+",\"normalizationOmitted\":"+std::to_string(aclNormalizationOmitted)+",\"normalizations\":["+aclNormalizationItems+"],\"output\":"+outputCleanupDiagnostic+"}");}catch(...){}
 }
 std::vector<unsigned char> userInfo;
 PSID MainUser(){return reinterpret_cast<TOKEN_USER*>(userInfo.data())->User.Sid;}
@@ -205,7 +215,7 @@ HANDLE Grant(const std::wstring& name,bool directory,PSID sid,DWORD mask,bool im
   return saved.handle.h;
 }
 bool RestoreGrants(){
-  bool okay=true;aclFailureItems.clear();aclFailureCount=0;aclFailureOmitted=0;
+  bool okay=true;aclFailureItems.clear();aclFailureCount=0;aclFailureOmitted=0;aclNormalizationItems.clear();aclNormalizationCount=0;aclNormalizationOmitted=0;
   // Parent restoration can propagate to children. Restore every object, then verify every final state.
   for(size_t index=0;index<grants.size();++index){auto& item=grants[index];PACL prior=nullptr;BOOL present=FALSE,defaulted=FALSE;
     const auto flags=DACL_SECURITY_INFORMATION|((item.control&SE_DACL_PROTECTED)?PROTECTED_DACL_SECURITY_INFORMATION:UNPROTECTED_DACL_SECURITY_INFORMATION);
@@ -219,7 +229,9 @@ bool RestoreGrants(){
     SetLastError(ERROR_SUCCESS);const bool read=identity&&GetSecurityDescriptorDacl(item.descriptor,&present,&prior,&defaulted);const DWORD readError=read?ERROR_SUCCESS:GetLastError();
     const DWORD queried=read?GetSecurityInfo(item.handle.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,nullptr,nullptr,&current,nullptr,&actual):ERROR_INVALID_DATA;
     bool equal=read&&queried==ERROR_SUCCESS,controlled=false;DWORD controlError=ERROR_SUCCESS;
-    if(equal){SetLastError(ERROR_SUCCESS);controlled=GetSecurityDescriptorControl(actual,&control,&revision);controlError=controlled?ERROR_SUCCESS:GetLastError();equal=controlled&&((control^item.control)&(SE_DACL_PROTECTED|SE_DACL_AUTO_INHERITED))==0&&prior&&current&&prior->AclSize==current->AclSize&&std::memcmp(prior,current,prior->AclSize)==0;}
+    if(equal){SetLastError(ERROR_SUCCESS);controlled=GetSecurityDescriptorControl(actual,&control,&revision);controlError=controlled?ERROR_SUCCESS:GetLastError();equal=controlled&&RestoredDaclControlEquivalent(item.control,control,item.directory)&&prior&&current&&prior->AclSize==current->AclSize&&std::memcmp(prior,current,prior->AclSize)==0;}
+    if(equal&&((control^item.control)&SE_DACL_AUTO_INHERITED)){try{++aclNormalizationCount;const auto text="{\"index\":"+std::to_string(index)+",\"directory\":true,\"priorControl\":"+std::to_string(item.control)+",\"currentControl\":"+std::to_string(control)+",\"reason\":\"unprotected_directory_auto_inherited_0_to_1\",\"exactAclBytes\":true}";
+      if(aclNormalizationItems.size()+text.size()+1>8192)++aclNormalizationOmitted;else{if(!aclNormalizationItems.empty())aclNormalizationItems+=',';aclNormalizationItems+=text;}}catch(...){++aclNormalizationOmitted;}}
     if(!equal){okay=false;AclFailure(index,item,"{\"stage\":\"verify\",\"identity\":"+std::string(identity?"true":"false")+",\"identityError\":"+std::to_string(identityError)+",\"baselineRead\":"+(read?"true":"false")+",\"baselineError\":"+std::to_string(readError)+",\"queryCode\":"+std::to_string(queried)+",\"controlRead\":"+(controlled?"true":"false")+",\"controlError\":"+std::to_string(controlError)+"}",prior,current,control);}
     if(actual)LocalFree(actual);
   }return okay;
