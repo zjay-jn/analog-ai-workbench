@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
 import { verifyFrozenWorkRecovery } from '../agent-work-cycle/interrupted-continuation';
 import { createHash, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -390,7 +391,7 @@ function dead(pid: number): boolean {
 export function createProjectReadStore(productRoot: string, directory = path.join(productRoot, '.local', 'agent-project-read')): ProjectReadStore {
   const base = path.resolve(productRoot), folder = path.resolve(directory);
   const relative = path.relative(base, folder).replaceAll('\\', '/');
-  if (base.toLowerCase() !== path.resolve('C:/work/analog_ai_workbench').toLowerCase()
+  if (base.toLowerCase() !== runtimePaths().storageRoot.toLowerCase()
     || (relative !== '.local/agent-project-read' && !/^\.local\/(?:agent-project-read-tests|agent-engine-live-tests)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/agent-project-read$/u.test(relative))) fail('CAPABILITY_DENIED');
   const target = path.join(folder, 'runs.json'), lock = path.join(folder, 'writer.lock');
   const own: LockData = { version: 1, pid: process.pid, nonce: randomUUID(), createdAt: new Date().toISOString() };

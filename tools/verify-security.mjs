@@ -148,7 +148,10 @@ const checks = {
     !preload.includes("reconcileVerifiedText"),
   nativeFsBuildHasNoLifecycleHook:
     packageManifest.scripts["build:native:fs"] ===
-      "node tools/build-windows-fs-native.mjs" &&
+      "node tools/setup-desktop.mjs build" &&
+    packageManifest.scripts["setup:desktop"] ===
+      "node tools/setup-desktop.mjs install" &&
+    packageManifest.scripts.doctor === "node tools/setup-desktop.mjs doctor" &&
     packageManifest.scripts.preinstall === undefined &&
     packageManifest.scripts.install === undefined &&
     packageManifest.scripts.postinstall === undefined &&

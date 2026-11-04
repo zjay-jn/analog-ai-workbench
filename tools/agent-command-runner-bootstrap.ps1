@@ -9,10 +9,12 @@ function Get-AAWCanonicalDirectory([string]$value) {
     if ($full.Length -gt $root.Length) { $full = $full.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) }
     return $full
 }
-# PowerShell 5.1 may omit C: when AppContainer cannot query volume-root attributes.
+# PowerShell 5.1 may omit the work volume when AppContainer cannot query root attributes.
 # Private provider roots preserve normal shell semantics without changing ancestor ACLs.
-try { $null = $ExecutionContext.SessionState.Drive.Get('C') }
-catch [System.Management.Automation.DriveNotFoundException] { New-PSDrive -Name C -PSProvider FileSystem -Root 'C:\' -Scope Global | Out-Null }
+$workVolume = [IO.Path]::GetPathRoot($nativeWorkingDirectory)
+$workDrive = $workVolume.Substring(0, 1)
+try { $null = $ExecutionContext.SessionState.Drive.Get($workDrive) }
+catch [System.Management.Automation.DriveNotFoundException] { New-PSDrive -Name $workDrive -PSProvider FileSystem -Root $workVolume -Scope Global | Out-Null }
 New-PSDrive -Name AAWWork -PSProvider FileSystem -Root $env:AAW_WORK -Scope Global | Out-Null
 New-PSDrive -Name AAWTools -PSProvider FileSystem -Root $env:AAW_RUNTIME -Scope Global | Out-Null
 $location = 'AAWWork:\'

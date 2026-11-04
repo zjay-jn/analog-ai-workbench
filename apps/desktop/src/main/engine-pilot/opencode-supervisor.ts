@@ -3,14 +3,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
+import {nativeWindowsEnvironment} from '../native-environment';
 import { PROJECT_READ_LIMITS } from '../../shared/agent/agent-project-read';
 import { OA_READ_TOOL_NAMES } from '../../shared/agent/oa-read';
 import { AGENT_SKILL_TOOL_NAMES } from '../../shared/agent/agent-skills';
 import {FILESYSTEM_TOOL_NAMES} from '../../shared/agent/agent-filesystem-read';
-import { ENGINE_GUARDIAN_IDENTITY, startEngineGuardian } from './engine-guardian';
+import { engineGuardianIdentity, startEngineGuardian } from './engine-guardian';
 
-const PRODUCT = path.resolve('C:/work/analog_ai_workbench');
-const PILOT_ROOT = path.join(PRODUCT, '.local', 'agent-engine-pilot');
 const START_TIMEOUT_MS = 30000;
 const HEALTH_TIMEOUT_MS = 1000;
 const STOP_TIMEOUT_MS = 3000;
@@ -18,15 +18,15 @@ const STOP_TIMEOUT_MS = 3000;
 /** Pins belong to this reviewed main module, never to a renderer request or discovered manifest. */
 export const OPENCODE_SUPERVISOR_IDENTITY = Object.freeze({
   version: '1.18.17',
-  executable: path.join(PRODUCT, '.local', 'agent-engine-candidate-v1.18.17', 'opencode.exe'),
+  get executable() { return runtimePaths().opencodeExecutable; },
   executableBytes: 178721160,
   executableSha256: '2d8ed451c4c3e4dd69b9dec026030ec5bd00814b8f2b81483f8d80e35d8dce54',
-  toolSource: path.join(PRODUCT, 'tools', 'agent-engine-pilot-sum.mjs'),
+  get toolSource() { return path.join(runtimePaths().installationRoot, 'tools', 'agent-engine-pilot-sum.mjs'); },
   toolBytes: 2728,
   toolSha256: '71f1ffffe434107ee28282eb13eb364934ecfa927daf3c03d9c42dafcd34a1c6',
 });
 export const PROJECT_READ_NATIVE_TOOL_IDENTITY = Object.freeze({
-  source: path.join(PRODUCT, 'tools', 'agent-project-read-tools.mjs'), bytes: 15160,
+  get source() { return path.join(runtimePaths().installationRoot, 'tools', 'agent-project-read-tools.mjs'); }, bytes: 15160,
   sha256: '96d30aed8315bb0b23bbaf8cc96171da04e7725779c2ba5e48ab0fefc9fbceeb',
 });
 const PROJECT_TOOL_NAMES = Object.freeze(['pilot_sum', 'project_list', 'project_find', 'project_search', 'project_read', 'wsl_results_list', 'wsl_results_read', 'wsl_waveform_list', 'wsl_waveform_read', 'wsl_waveform_metrics', ...OA_READ_TOOL_NAMES,...AGENT_SKILL_TOOL_NAMES,...FILESYSTEM_TOOL_NAMES]);
@@ -89,7 +89,8 @@ function validateServices(options: unknown): Services {
 
 function samePath(first: string, second: string): boolean { return path.resolve(first).toLowerCase() === path.resolve(second).toLowerCase(); }
 function contained(filename: string): void {
-  if (!path.resolve(filename).toLowerCase().startsWith(PRODUCT.toLowerCase() + path.sep)) throw new OpenCodeSupervisorError('IDENTITY_MISMATCH');
+  const roots = runtimePaths();
+  if (![roots.installationRoot, roots.storageRoot].some(root => path.resolve(filename).toLowerCase().startsWith(root.toLowerCase() + path.sep))) throw new OpenCodeSupervisorError('IDENTITY_MISMATCH');
 }
 /** Check each ancestor, including the product root; junction/alias resolutions are rejected. */
 function verifyPath(filename: string, regular: boolean): fs.Stats {
@@ -129,6 +130,7 @@ function writeNew(filename: string, contents: string | Buffer): void {
 }
 
 function prepareLaunch(services: Services, port: number, password: string, profile?:ExecutionProfile,conversation?:boolean) {
+  const locations = runtimePaths(), PRODUCT = locations.installationRoot, PILOT_ROOT = locations.pilotRoot;
   const identity = OPENCODE_SUPERVISOR_IDENTITY;
   // Never discover another binary or accept the hash found beside a substituted candidate.
   pinnedFile(identity.executable, identity.executableBytes, identity.executableSha256);
@@ -136,7 +138,8 @@ function prepareLaunch(services: Services, port: number, password: string, profi
   const projectModule = profile==='project-read'||profile==='work-cycle' ? pinnedFile(PROJECT_READ_NATIVE_TOOL_IDENTITY.source, PROJECT_READ_NATIVE_TOOL_IDENTITY.bytes, PROJECT_READ_NATIVE_TOOL_IDENTITY.sha256) : null;
   const toolNames = profile==='work-cycle' ? WORK_TOOL_NAMES : PROJECT_TOOL_NAMES;
   verifyPath(PRODUCT, false);
-  for (const directory of [path.join(PRODUCT, '.local'), PILOT_ROOT, path.join(PILOT_ROOT, 'native')]) createDirectory(directory);
+  verifyPath(locations.storageRoot, false);
+  for (const directory of [locations.dataRoot, PILOT_ROOT, path.join(PILOT_ROOT, 'native')]) createDirectory(directory);
   const root = path.join(PILOT_ROOT, 'native', crypto.randomUUID());
   createDirectory(root, true);
   const dirs = Object.fromEntries(['cwd', 'home', 'config', 'data', 'cache', 'state', 'temp', 'managed', 'appdata', 'localappdata'].map(name => [name, path.join(root, name)])) as Record<string, string>;
@@ -206,10 +209,10 @@ function prepareLaunch(services: Services, port: number, password: string, profi
       configuration.agent={...configuration.agent as Record<string,unknown>,compaction:recipe.compactionAgent};
     }
   }
-  const windows = path.resolve('C:/Windows');
+  const os = nativeWindowsEnvironment(), windows = os.SystemRoot!;
   // Construct from an empty object: no inherited keys, credential sources, proxies, NODE_OPTIONS or personal paths.
   const env: NodeJS.ProcessEnv = {
-    SystemRoot: windows, WINDIR: windows, PATH: path.join(windows, 'System32'),
+    SystemRoot: windows, WINDIR: windows, SystemDrive: os.SystemDrive!, PATH: path.join(windows, 'System32'),
     HOME: dirs.home!, USERPROFILE: dirs.home!, APPDATA: dirs.appdata!, LOCALAPPDATA: dirs.localappdata!, TEMP: dirs.temp!, TMP: dirs.temp!,
     XDG_CONFIG_HOME: dirs.config!, XDG_DATA_HOME: dirs.data!, XDG_CACHE_HOME: dirs.cache!, XDG_STATE_HOME: dirs.state!,
     OPENCODE_TEST_HOME: dirs.home!, OPENCODE_TEST_MANAGED_CONFIG_DIR: dirs.managed!, OPENCODE_CONFIG_DIR: configDirectory,
@@ -254,8 +257,7 @@ export async function startOpenCodeSupervisor(options: Readonly<{ services: Serv
     const port = await choosePort(), password = crypto.randomBytes(32).toString('hex');
     if (port === services.port || password === services.providerToken || password === services.toolToken) throw new OpenCodeSupervisorError('INVALID_CONFIGURATION');
     const plan = prepareLaunch(services, port, password, profile, conversation);
-    if(!ENGINE_GUARDIAN_IDENTITY)throw new OpenCodeSupervisorError('IDENTITY_MISMATCH');
-    const guardian=startEngineGuardian({root:plan.root,port,env:plan.env,identity:ENGINE_GUARDIAN_IDENTITY}),child=guardian.child;
+    const guardian=startEngineGuardian({root:plan.root,port,env:plan.env,identity:engineGuardianIdentity()}),child=guardian.child;
     const ownership = {};
     ownedProcess = ownership;
     let exit: OpenCodeSupervisorExit | undefined, stopping = false, processFailed = false, stoppingPromise: Promise<OpenCodeSupervisorExit> | undefined;

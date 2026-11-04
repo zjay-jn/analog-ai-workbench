@@ -9,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const config = path.join(root, 'tests/tsconfig.public.json');
 const { include } = JSON.parse(readFileSync(config, 'utf8'));
 const tests = include.filter(file => /^[a-z0-9-]+\.test\.ts$/u.test(file));
-if (tests.length !== 11 || process.argv.length !== 2) throw Error('Unexpected public core test configuration');
+if (tests.length < 1 || tests.length > 64 || new Set(tests).size !== tests.length || process.argv.length !== 2) throw Error('Unexpected public core test configuration');
 for (const directory of [path.join(root, '.local'), path.join(root, '.local/public-test-build')]) {
   mkdirSync(directory, { recursive: true });
   if (lstatSync(directory).isSymbolicLink() || realpathSync.native(directory).toLowerCase() !== directory.toLowerCase()) throw Error('Refuse aliased test output');

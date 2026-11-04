@@ -8,7 +8,13 @@ The current integration pins OpenCode `v1.18.17`, source commit `02546dfc2e4515a
 
 - Source: https://github.com/anomalyco/opencode/tree/v1.18.17
 - License: https://github.com/anomalyco/opencode/blob/v1.18.17/LICENSE (MIT).
-- This source preview does not bundle the OpenCode executable. Preserve its upstream notices when preparing a binary distribution; this file is not a complete inventory of that executable's bundled components.
+- The source tree excludes executable payloads. The Windows installer bundles this fixed upstream executable and its MIT notice. Its embedded Bun runtime reports version `1.3.14`; Bun and its linked WebKit/JavaScriptCore and other libraries retain their upstream licenses. Matching upstream notices and source/relinking references are in `tools/runtime-licenses` and are copied into the installer under `resources/app/licenses/runtime`.
+
+## Binary installation components
+
+The installer includes Node.js `24.20.0` with its complete `LICENSE`, and Electron `43.4.0` with `LICENSE` and `LICENSES.chromium.html`. Installed npm packages' available license/notice texts accompany the bundled JavaScript. Development-only packages may appear in that notice collection without being linked into the installed program.
+
+NSIS `3.13` is a build tool. Its compiler and SDK are not installed on the user's computer. The installer/uninstaller include NSIS runtime stubs and compression code; their upstream `COPYING` is included. Source and license information: https://nsis.sourceforge.io/License and https://sourceforge.net/projects/nsis/files/NSIS%203/3.13/ .
 
 ## JavaScript dependencies
 

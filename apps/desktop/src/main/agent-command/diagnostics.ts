@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
 import {randomUUID} from 'node:crypto';
 import {WorkCycleError} from '../agent-work-cycle/types';
 import {CommandPreparationError} from './types';
-import {COMMAND_PRODUCT,inspectNativePath,nativeRead} from './native-files';
+import {commandProduct,inspectNativePath,nativeRead} from './native-files';
 import {commandDiagnosticCauseCode,commandDiagnosticStackFrame,commandDiagnosticVersion,isCommandDiagnosticInput,isCommandDiagnosticRecord,type CommandDiagnosticCauseCode,type CommandDiagnosticInput,type CommandDiagnosticReadResult,type CommandDiagnosticRecord} from '../../shared/agent/command-diagnostics';
 export type {CommandDiagnosticInput,CommandDiagnosticReadResult,CommandDiagnosticRecord} from '../../shared/agent/command-diagnostics';
 export interface CommandDiagnosticJournal {
@@ -34,7 +35,7 @@ function cause(error:unknown):CommandDiagnosticCauseCode {
 /** Copy only file/line coordinates from our code. Function names and exception messages are excluded. */
 function stackFrames(error:unknown):readonly string[]{
  if(!(error instanceof Error))return [];const stack=stackValue(error);if(typeof stack!=='string'||stack.length>65536)return [];
- const root=COMMAND_PRODUCT.replaceAll('\\','/').toLowerCase()+'/',result:string[]=[];
+ const root=runtimePaths().installationRoot.replaceAll('\\','/').toLowerCase()+'/',result:string[]=[];
  for(const line of stack.split(/\r?\n/u).slice(1,33)){
   const m=/((?:[A-Za-z]:[\\/])[^()\r\n]+):(\d+):(\d+)\)?$/u.exec(line);if(!m)continue;
   const absolute=m[1]!.replaceAll('\\','/');if(!absolute.toLowerCase().startsWith(root))continue;
@@ -47,11 +48,11 @@ const nodeCode=(e:unknown)=>(e instanceof Error?data(e,'code'):undefined);
 /** One main-owned journal; synchronous append/rotation cannot reorder the first failure behind cleanup. */
 export function createCommandDiagnosticJournal(options:Readonly<{directory:string;appVersion:string;maxFileBytes?:number;maxFiles?:number;now?:()=>number}>):CommandDiagnosticJournal {
  const directory=path.resolve(options.directory),maxFileBytes=options.maxFileBytes??1024*1024,maxFiles=options.maxFiles??3,now=options.now??Date.now;
- const relative=path.relative(COMMAND_PRODUCT,directory),valid=!!relative&&!relative.startsWith('..')&&!path.isAbsolute(relative)&&commandDiagnosticVersion(options.appVersion)&&Number.isSafeInteger(maxFileBytes)&&maxFileBytes>=1024&&maxFileBytes<=8*1024*1024&&Number.isInteger(maxFiles)&&maxFiles>=2&&maxFiles<=3;
+ const relative=path.relative(commandProduct(),directory),valid=!!relative&&!relative.startsWith('..')&&!path.isAbsolute(relative)&&commandDiagnosticVersion(options.appVersion)&&Number.isSafeInteger(maxFileBytes)&&maxFileBytes>=1024&&maxFileBytes<=8*1024*1024&&Number.isInteger(maxFiles)&&maxFiles>=2&&maxFiles<=3;
  let available=valid;
  const file=(index:number)=>path.join(directory,index===0?'diagnostics.jsonl':`diagnostics.${index}.jsonl`);
  function ensure():void {
-  const create=(target:string):void=>{try{inspectNativePath(target,true);}catch(e){if(nodeCode(e)!=='ENOENT'||target===COMMAND_PRODUCT)throw e;create(path.dirname(target));fs.mkdirSync(target,{mode:0o700});inspectNativePath(target,true);}};
+  const create=(target:string):void=>{try{inspectNativePath(target,true);}catch(e){if(nodeCode(e)!=='ENOENT'||target===commandProduct())throw e;create(path.dirname(target));fs.mkdirSync(target,{mode:0o700});inspectNativePath(target,true);}};
   if(!valid)throw new Error('Invalid diagnostic location');create(directory);
  }
  function readAll():{records:CommandDiagnosticRecord[];truncated:boolean}{

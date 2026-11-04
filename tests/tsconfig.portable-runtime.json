@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {"outDir": "../.local/portable-runtime-check/test-build"},
+  "include": ["portable-runtime-paths.test.ts", "portable-runtime-manifest.test.ts", "agent-engine-guardian.test.ts", "../apps/desktop/src/renderer/types/global.d.ts"]
+}

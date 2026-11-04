@@ -2,9 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {OpenCodePilotError} from '../engine-pilot/opencode-client';
+import {runtimePaths} from '../runtime-paths';
 
 export type NativeConversationBinding={version:1;conversationId:string;sessionId:string;migrationHash:string;migrationComplete:boolean;externalTurnIds:string[];historyCount:number;historyHash:string;pending:boolean};
-export const DEFAULT_NATIVE_CONVERSATION_DIRECTORY=path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-pilot/conversations');
+export const DEFAULT_NATIVE_CONVERSATION_DIRECTORY=path.join(runtimePaths().pilotRoot,'conversations');
 // The native paginated route uses a raw JSON response while its final page uses
 // the API schema encoder. Both preserve values but may reorder object fields.
 const canonical=(value:unknown):unknown=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)])):value;
@@ -12,8 +13,8 @@ export const nativeHistoryHash=(rows:unknown):string=>createHash('sha256').updat
 const fail=():never=>{throw new OpenCodePilotError();};
 const uuid=(value:string)=>/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu.test(value);
 /** Main-owned bindings contain identifiers and integrity receipts, never credentials or duplicated history. */
-export function createNativeConversationStore(directory=DEFAULT_NATIVE_CONVERSATION_DIRECTORY){
-  const base=path.resolve(directory),product=path.resolve('C:/work/analog_ai_workbench');
+export function createNativeConversationStore(directory=path.join(runtimePaths().pilotRoot,'conversations')){
+  const base=path.resolve(directory),product=runtimePaths().dataRoot;
   if(!base.toLowerCase().startsWith(product.toLowerCase()+path.sep))fail();
   const verify=(filename:string,file=false)=>{let cursor=path.resolve(filename);for(;;){const stat=fs.lstatSync(cursor);if(stat.isSymbolicLink()||path.resolve(fs.realpathSync(cursor)).toLowerCase()!==cursor.toLowerCase()||cursor===filename&&(file?(!stat.isFile()||stat.nlink!==1):!stat.isDirectory()))fail();const parent=path.dirname(cursor);if(parent===cursor)break;cursor=parent;}};
   const filename=(id:string)=>{if(!uuid(id))fail();return path.join(base,'bindings',id.toLowerCase()+'.json');};

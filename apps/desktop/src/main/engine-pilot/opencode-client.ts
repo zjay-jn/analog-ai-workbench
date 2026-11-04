@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
+import {runtimePaths} from '../runtime-paths';
 import { pilotExact, pilotId, pilotText } from '../../shared/agent/engine-pilot';
 import type { PilotEngine, EngineNotice } from './engine';
 import { PROJECT_READ_LIMITS } from '../../shared/agent/agent-project-read';
@@ -33,7 +34,7 @@ export function createOpenCodePilotClient(options:Readonly<{port:number;password
   if(options.conversation!==undefined&&typeof options.conversation!=='boolean'||options.conversation===true&&options.profile!=='work-cycle')throw new OpenCodePilotError();
   const responseBytes=options.conversation===true?4*1024*1024:1048576;
   if(!Number.isSafeInteger(options.port)||options.port<1024||options.port>65535||!/^[0-9a-f]{64}$/u.test(options.password))throw new OpenCodePilotError();
-  const directory=path.resolve(options.directory),parent=path.resolve('C:/work/analog_ai_workbench/.local/agent-engine-pilot');
+  const directory=path.resolve(options.directory),parent=runtimePaths().pilotRoot;
   if(!directory.startsWith(parent+path.sep))throw new OpenCodePilotError();
   const origin=`http://127.0.0.1:${options.port}`,nativeSessions=new Set<string>();let closed=false,acceptedSessions=0;
   const controllers=new Set<AbortController>();
